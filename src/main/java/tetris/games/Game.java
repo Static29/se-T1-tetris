@@ -1,4 +1,4 @@
-package tetris.game;
+package tetris.games;
 
 public class Game {
     private GameState state = GameState.READY;
