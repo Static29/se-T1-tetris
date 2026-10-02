@@ -26,7 +26,7 @@ public class ScreenController {
         Set<KeyCode> held = EnumSet.noneOf(KeyCode.class);
         scene.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
             KeyCode code = event.getCode();
-            if ((code == KeyCode.ENTER || code == KeyCode.P || code == KeyCode.ESCAPE
+            if ((code == KeyCode.ENTER || code == KeyCode.ESCAPE
                     || code == KeyCode.C)
                     && !held.add(code)) {
                 event.consume();
@@ -56,7 +56,7 @@ public class ScreenController {
     public void startGame() {
         Game game = new Game();
         game.start();
-        showScreen(new GameView(game, this::showMainMenu));
+        showScreen(new GameView(game, this::showMainMenu, Platform::exit));
     }
 
     private void showComingSoon(String title) {

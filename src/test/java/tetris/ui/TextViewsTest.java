@@ -21,7 +21,7 @@ class TextViewsTest {
                 TetrominoType.I, TetrominoType.T, TetrominoType.O));
         Game game = new Game(queue::removeFirst);
         game.start();
-        GameView view = new GameView(game, () -> { });
+        GameView view = new GameView(game, () -> { }, () -> { });
         assertTrue(allText(view).contains("NEXT"));
         assertTrue(allText(view).contains(PiecePreviewView.format(TetrominoType.T)));
         press(view, KeyCode.C);
@@ -69,18 +69,58 @@ class TextViewsTest {
     }
 
     @Test
-    void textGameScreenPausesResumesAndReturnsToMenu() {
+    void escapeMenuPausesBlocksHoldAndResumesWithoutResettingGame() {
         Game game = new Game();
         game.start();
         AtomicInteger returns = new AtomicInteger();
-        GameView view = new GameView(game, returns::incrementAndGet);
-        press(view, KeyCode.P);
-        assertEquals(GameState.PAUSED, game.getState());
+        GameView view = new GameView(game, returns::incrementAndGet, () -> { });
+        TetrominoType current = game.getCurrentType();
+        TetrominoType next = game.getNextType();
         press(view, KeyCode.P);
         assertEquals(GameState.RUNNING, game.getState());
         press(view, KeyCode.ESCAPE);
         assertEquals(GameState.PAUSED, game.getState());
+        assertEquals(0, returns.get());
+        PauseMenuView menu = (PauseMenuView) view.getChildren().get(1);
+        press(menu, KeyCode.C);
+        assertNull(game.getHeldType());
+        press(menu, KeyCode.ESCAPE);
+        assertEquals(GameState.RUNNING, game.getState());
+        assertEquals(current, game.getCurrentType());
+        assertEquals(next, game.getNextType());
+        assertEquals(1, view.getChildren().size());
+        press(view, KeyCode.ESCAPE);
+        press(view, KeyCode.ENTER);
+        assertEquals(GameState.RUNNING, game.getState());
+    }
+
+    @Test
+    void settingsReturnsToPausedMenuAndMainMenuAndExitAreSeparateActions() {
+        Game game = new Game();
+        game.start();
+        AtomicInteger returns = new AtomicInteger();
+        AtomicInteger exits = new AtomicInteger();
+        GameView view = new GameView(game, returns::incrementAndGet, exits::incrementAndGet);
+        press(view, KeyCode.ESCAPE);
+        PauseMenuView menu = (PauseMenuView) view.getChildren().get(1);
+        press(menu, KeyCode.DOWN);
+        press(menu, KeyCode.ENTER);
+        assertTrue(allText(menu).contains("아직 준비 중"));
+        press(menu, KeyCode.C);
+        assertNull(game.getHeldType());
+        press(menu, KeyCode.ESCAPE);
+        assertEquals(GameState.PAUSED, game.getState());
+        assertTrue(allText(menu).contains("> 설정"));
+        press(menu, KeyCode.DOWN);
+        press(menu, KeyCode.ENTER);
         assertEquals(1, returns.get());
+        assertEquals(0, exits.get());
+        assertEquals(GameState.PAUSED, game.getState());
+        press(menu, KeyCode.DOWN);
+        press(menu, KeyCode.ENTER);
+        assertEquals(1, exits.get());
+        press(menu, KeyCode.DOWN);
+        assertTrue(allText(menu).contains("> 게임으로 복귀"));
     }
 
     private void press(Node target, KeyCode code) {

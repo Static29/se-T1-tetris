@@ -5,6 +5,7 @@ import javafx.geometry.Pos;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
+import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
@@ -12,15 +13,15 @@ import tetris.games.Game;
 import tetris.games.GameState;
 
 /** 게임 데이터와 상태를 문자로 표시한다. 실제 보드와 자동 하강은 아직 연결하지 않는다. */
-public class GameView extends VBox {
+public class GameView extends StackPane {
     private final Game game;
     private final Text status = createText("", 19);
     private final PiecePreviewView nextPreview = new PiecePreviewView("NEXT");
     private final PiecePreviewView holdPreview = new PiecePreviewView("HOLD");
     private final Text holdHint = createText("", 14);
+    private PauseMenuView pauseMenu;
 
-    public GameView(Game game, Runnable onMainMenu) {
-        super(16);
+    public GameView(Game game, Runnable onMainMenu, Runnable onExit) {
         this.game = game;
         setPadding(new Insets(24));
         setAlignment(Pos.CENTER);
@@ -34,26 +35,38 @@ public class GameView extends VBox {
         nextArea.setAlignment(Pos.TOP_CENTER);
         HBox playArea = new HBox(24, holdArea, board, nextArea);
         playArea.setAlignment(Pos.CENTER);
-        getChildren().addAll(createText("===== TETRIS =====", 22), playArea,
+        VBox gameContent = new VBox(16, createText("===== TETRIS =====", 22), playArea,
                 createText("빈 보드 미리보기 · 게임 로직 연결 예정", 16),
-                createText("C: Hold   P: 일시정지 / 재개   Esc: 메뉴로 돌아가기", 16));
+                createText("C: Hold   Esc: 일시정지 메뉴", 16));
+        gameContent.setAlignment(Pos.CENTER);
+        getChildren().add(gameContent);
 
         setOnKeyPressed(event -> {
-            if (event.getCode() == KeyCode.P) {
-                game.togglePause();
+            if (pauseMenu != null) {
+                // 포커스가 게임 화면에 남아 있어도 메뉴만 입력을 처리한다.
+                pauseMenu.getOnKeyPressed().handle(event);
+            } else if (event.getCode() == KeyCode.ESCAPE && game.getState() == GameState.RUNNING) {
+                game.pause();
                 refresh();
+                pauseMenu = new PauseMenuView(this::resumeGame, onMainMenu, onExit);
+                getChildren().add(pauseMenu);
+                pauseMenu.requestFocus();
                 event.consume();
             } else if (event.getCode() == KeyCode.C) {
                 game.hold();
                 refresh();
                 event.consume();
-            } else if (event.getCode() == KeyCode.ESCAPE) {
-                game.pause();
-                onMainMenu.run();
-                event.consume();
             }
         });
         refresh();
+    }
+
+    private void resumeGame() {
+        getChildren().remove(pauseMenu);
+        pauseMenu = null;
+        game.resume();
+        refresh();
+        requestFocus();
     }
 
     /** Game 갱신 후 JavaFX Application Thread에서 호출한다. */
