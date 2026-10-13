@@ -11,19 +11,68 @@ public class Block {
     private int x;
     private int y;
     private int[][] cells;
+    private final ItemType itemType;
+    private final int itemCellIndex;
 
     public Block(TetrominoType type) {
         this(type, 0, 0);
     }
 
     public Block(TetrominoType type, int x, int y) {
-        this.type = Objects.requireNonNull(type, "type");
-        this.x = x;
-        this.y = y;
-        this.cells = type.getCells();
+        this(Objects.requireNonNull(type, "type"), x, y, type.getCells(), null, -1);
     }
 
+    private Block(TetrominoType type, int x, int y, int[][] cells,
+                  ItemType itemType, int itemCellIndex) {
+        this.type = type;
+        this.x = x;
+        this.y = y;
+        this.cells = translated(cells, 0, 0);
+        this.itemType = itemType;
+        this.itemCellIndex = itemCellIndex;
+    }
+
+    static Block withItem(TetrominoType type, int x, int y, ItemType item, int cellIndex) {
+        Objects.requireNonNull(type, "type");
+        Objects.requireNonNull(item, "item");
+        if (item == ItemType.WEIGHT) throw new IllegalArgumentException("무게추는 별도 모양입니다.");
+        int[][] cells = type.getCells();
+        if (cellIndex < 0 || cellIndex >= cells.length) throw new IllegalArgumentException("잘못된 아이템 칸");
+        return new Block(type, x, y, cells, item, cellIndex);
+    }
+
+    static Block weight(int x, int y) {
+        return new Block(null, x, y,
+                new int[][] {{1, 0}, {2, 0}, {0, 1}, {1, 1}, {2, 1}, {3, 1}},
+                ItemType.WEIGHT, -1);
+    }
+
+    /** 일반/부착형 블록의 종류. 별도 모양인 무게추는 null이며 hasItem/getItemType으로 구분한다. */
     public TetrominoType getType() { return type; }
+    public boolean hasItem() { return itemType != null; }
+    /** 일반 블록은 null을 반환한다. */
+    public ItemType getItemType() { return itemType; }
+
+    /** 부착된 아이템 한 칸의 상대 좌표. 일반 블록과 무게추는 빈 배열을 반환한다. */
+    public int[][] getItemCells() {
+        if (itemCellIndex < 0) return new int[0][2];
+        return new int[][] {cells[itemCellIndex].clone()};
+    }
+
+    /** 고정 시 보드/점수 담당자가 효과를 적용할 아이템 칸의 절대 좌표. */
+    public int[][] getBoardItemCells() {
+        return translated(getItemCells(), x, y);
+    }
+
+    /** 상대 위치의 표시 문자. 빈칸은 '.', 일반 칸은 'O', 아이템 칸은 고유 문자. */
+    public char getCellSymbol(int localX, int localY) {
+        for (int i = 0; i < cells.length; i++) {
+            if (cells[i][0] == localX && cells[i][1] == localY) {
+                return i == itemCellIndex ? itemType.getSymbol() : 'O';
+            }
+        }
+        return '.';
+    }
     public int getX() { return x; }
     public int getY() { return y; }
 
@@ -72,7 +121,7 @@ public class Block {
     }
 
     private int[][] rotatedCells() {
-        if (type == TetrominoType.O) {
+        if (type == TetrominoType.O || itemType == ItemType.WEIGHT) {
             return getCells();
         }
         int height = height();
