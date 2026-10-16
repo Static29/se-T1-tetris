@@ -39,10 +39,8 @@ public class Board {
         this.bufferRows = bufferRows;
         this.columns = columns;
         this.cells = new Cell[bufferRows + visibleRows][];
-        // 생성자에서는 재정의될 수 있는 clear() 대신 직접 채운다.
-        for (int row = 0; row < cells.length; row++) {
-            cells[row] = emptyRow();
-        }
+        // 생성자에서는 재정의될 수 있는 clear() 대신 private 메서드로 채운다.
+        fillEmptyRows(0, cells.length);
     }
 
     public int getVisibleRows() { return visibleRows; }
@@ -51,7 +49,7 @@ public class Board {
     public int getColumns() { return columns; }
 
     public boolean isInside(int row, int col) {
-        return row >= 0 && row < cells.length && col >= 0 && col < columns;
+        return isRowInside(row) && col >= 0 && col < columns;
     }
 
     public boolean isInside(Position position) {
@@ -61,7 +59,7 @@ public class Board {
 
     /** 버퍼가 아닌, 화면에 보이는 줄인지 확인한다. */
     public boolean isVisibleRow(int row) {
-        return row >= bufferRows && row < cells.length;
+        return isRowInside(row) && row >= bufferRows;
     }
 
     /** 보드 밖 좌표는 IndexOutOfBoundsException을 던진다. 벽·바닥 판정에는 isEmpty를 사용한다. */
@@ -159,25 +157,22 @@ public class Board {
         if (fullRows.isEmpty()) {
             return fullRows;
         }
-        // 아래에서 위로 올라가며 남길 줄만 아래쪽부터 다시 채운다.
+        // 아래에서 위로 올라가며 남길 줄만 아래쪽부터 다시 채운다. 가득 찬 줄은 위에서 이미 찾았다.
         int targetRow = cells.length - 1;
         for (int row = cells.length - 1; row >= 0; row--) {
-            if (!isRowFull(row)) {
+            if (!fullRows.contains(row)) {
                 cells[targetRow] = cells[row];
                 targetRow--;
             }
         }
-        for (int row = targetRow; row >= 0; row--) {
-            cells[row] = emptyRow();
-        }
+        // 내려오고 남은 맨 위 0 ~ targetRow번 줄을 빈 줄로 채운다.
+        fillEmptyRows(0, targetRow + 1);
         return fullRows;
     }
 
     /** 모든 칸을 비운다. 새 게임을 시작할 때 사용한다. */
     public void clear() {
-        for (int row = 0; row < cells.length; row++) {
-            cells[row] = emptyRow();
-        }
+        fillEmptyRows(0, cells.length);
     }
 
     /** 독립적인 깊은 복사본. 원본과 복사본은 서로 영향을 주지 않는다. AI 시뮬레이션이나 대전 모드에서 사용한다. */
@@ -223,14 +218,28 @@ public class Board {
         return row;
     }
 
+    /** fromRow 이상 toRowExclusive 미만 줄을 각각 새 빈 줄로 바꾼다. 줄마다 다른 배열을 쓴다. */
+    private void fillEmptyRows(int fromRow, int toRowExclusive) {
+        for (int row = fromRow; row < toRowExclusive; row++) {
+            cells[row] = emptyRow();
+        }
+    }
+
+    /** 버퍼를 포함한 보드 줄 범위 안인지. isInside·isVisibleRow·checkRow가 같은 기준을 쓰게 한다. */
+    private boolean isRowInside(int row) {
+        return row >= 0 && row < cells.length;
+    }
+
+    /** isInside의 예외 버전. 배열 예외 대신 row·col을 함께 담은 메시지를 준다. */
     private void checkInside(int row, int col) {
         if (!isInside(row, col)) {
             throw new IndexOutOfBoundsException("보드 밖 좌표입니다: row=" + row + ", col=" + col);
         }
     }
 
+    /** isRowInside의 예외 버전. 줄 번호만 받는 메서드(isRowFull)에서 사용한다. */
     private void checkRow(int row) {
-        if (row < 0 || row >= cells.length) {
+        if (!isRowInside(row)) {
             throw new IndexOutOfBoundsException("보드 밖 줄입니다: row=" + row);
         }
     }
