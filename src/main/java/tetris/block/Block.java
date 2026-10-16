@@ -13,13 +13,14 @@ public class Block {
     private int[][] cells;
     private final ItemType itemType;
     private final int itemCellIndex;
+    private int rotationState;
 
     public Block(TetrominoType type) {
         this(type, 0, 0);
     }
 
     public Block(TetrominoType type, int x, int y) {
-        this(Objects.requireNonNull(type, "type"), x, y, type.getCells(), null, -1);
+        this(Objects.requireNonNull(type, "type"), x, y, spawnCells(type), null, -1);
     }
 
     private Block(TetrominoType type, int x, int y, int[][] cells,
@@ -36,7 +37,7 @@ public class Block {
         Objects.requireNonNull(type, "type");
         Objects.requireNonNull(item, "item");
         if (item == ItemType.WEIGHT) throw new IllegalArgumentException("무게추는 별도 모양입니다.");
-        int[][] cells = type.getCells();
+        int[][] cells = spawnCells(type);
         if (cellIndex < 0 || cellIndex >= cells.length) throw new IllegalArgumentException("잘못된 아이템 칸");
         return new Block(type, x, y, cells, item, cellIndex);
     }
@@ -76,6 +77,15 @@ public class Block {
     public int getX() { return x; }
     public int getY() { return y; }
 
+    /** 0=생성 방향, 1=R, 2=180도, 3=L. O와 무게추는 0을 유지한다. */
+    public int getRotationState() { return rotationState; }
+
+    /** 빈칸을 포함한 고정 회전 공간 크기. x/y는 이 공간의 왼쪽 위다. */
+    public int getFrameSize() {
+        if (type == TetrominoType.I || itemType == ItemType.WEIGHT) return 4;
+        return type == TetrominoType.O ? 2 : 3;
+    }
+
     /** 현재 모양의 {x, y} 상대 좌표 복사본을 반환한다. */
     public int[][] getCells() {
         return translated(cells, 0, 0);
@@ -98,39 +108,81 @@ public class Block {
 
     /** 상태를 바꾸지 않고 회전 후 보드상의 절대 좌표를 반환한다. */
     public int[][] previewRotation() {
-        return translated(rotatedCells(), x, y);
+        return previewRotation(0);
     }
 
     /**
-     * 감싸는 사각형의 왼쪽 위 위치를 유지하며 시계 방향으로 90도 회전한다.
-     * O는 그대로 유지한다. 고정 회전 중심과 wall kick은 적용하지 않는다.
+     * 시계 방향 SRS 보정 후보의 {dx, dy} 복사본. y는 아래쪽이 양수다.
+     * 보드는 순서대로 충돌 검사하고 첫 번째 가능한 후보만 적용해야 한다.
+     * O와 무게추는 이동 없는 후보 하나만 제공한다.
      */
-    public void rotate() {
-        cells = rotatedCells();
+    public int[][] getRotationOffsets() {
+        if (!canChangeOrientation()) return new int[][] {{0, 0}};
+        return SrsRotation.clockwiseOffsets(type, rotationState);
     }
 
+    /** 상태 변경 없이 지정 후보의 회전 후 보드 절대 좌표를 반환한다. */
+    public int[][] previewRotation(int candidateIndex) {
+        int[] offset = rotationOffset(candidateIndex);
+        return translated(rotatedCells(), x + offset[0], y + offset[1]);
+    }
+
+    /** 고정 중심으로 시계 방향 90도 회전. 충돌 검사/벽 차기 선택은 수행하지 않는다. */
+    public void rotate() {
+        rotate(0);
+    }
+
+    /** 보드가 검증한 후보를 적용한다. 모든 후보가 막혔다면 호출하지 않는다. */
+    public void rotate(int candidateIndex) {
+        int[] offset = rotationOffset(candidateIndex);
+        cells = rotatedCells();
+        x += offset[0];
+        y += offset[1];
+        if (canChangeOrientation()) rotationState = (rotationState + 1) % 4;
+    }
+
+    /** 점유 칸만 감싼 너비/높이. 상대 좌표에는 앞쪽 빈 행/열이 남을 수 있다. */
     public int width() { return extent(0); }
     public int height() { return extent(1); }
 
     private int extent(int axis) {
-        int max = 0;
+        int max = Integer.MIN_VALUE;
+        int min = Integer.MAX_VALUE;
         for (int[] cell : cells) {
             max = Math.max(max, cell[axis]);
+            min = Math.min(min, cell[axis]);
         }
-        return max + 1;
+        return max - min + 1;
     }
 
     private int[][] rotatedCells() {
-        if (type == TetrominoType.O || itemType == ItemType.WEIGHT) {
+        if (!canChangeOrientation()) {
             return getCells();
         }
-        int height = height();
+        int size = getFrameSize();
         int[][] result = new int[cells.length][2];
         for (int i = 0; i < cells.length; i++) {
-            result[i][0] = height - 1 - cells[i][1];
+            result[i][0] = size - 1 - cells[i][1];
             result[i][1] = cells[i][0];
         }
         return result;
+    }
+
+    private boolean canChangeOrientation() {
+        return type != TetrominoType.O && itemType != ItemType.WEIGHT;
+    }
+
+    private int[] rotationOffset(int candidateIndex) {
+        int[][] offsets = getRotationOffsets();
+        if (candidateIndex < 0 || candidateIndex >= offsets.length) {
+            throw new IllegalArgumentException("회전 후보 범위 밖: " + candidateIndex);
+        }
+        return offsets[candidateIndex];
+    }
+
+    private static int[][] spawnCells(TetrominoType type) {
+        // I는 4x4 공간의 두 번째 행에 놓아 중심 (1.5, 1.5)를 유지한다.
+        return translated(type.getCells(), 0, type == TetrominoType.I ? 1 : 0);
     }
 
     private static int[][] translated(int[][] source, int dx, int dy) {

@@ -22,6 +22,11 @@ Block line = factory.create(true, selectedType, ItemType.LINE_CLEAR, spawnX, spa
 ## 좌표 및 화면 표시
 
 - `getCells()`는 상대 좌표, `getBoardCells()`와 미리보기는 보드 절대 좌표다. 모두 `{x, y}` 순서.
+- SRS 적용 후 `getX()/getY()`는 점유 칸의 최소 좌표가 아닌 **고정 회전 공간의 원점**이다.
+  J/L/S/T/Z는 3x3, I는 4x4 공간이며 앞쪽 빈 행/열을 제거하지 않는다.
+  I는 처음에 4x4의 두 번째 행(y=1)을 차지한다. `TetrominoType.getCells()`의 기존 기본 모양은 유지했다.
+- `width()/height()`는 점유 칸만 감싼 크기다. 상대 좌표의 최댓값+1을 의미하지 않는다.
+  표시는 `getCells()` 좌표를 직접 순회하거나 `getFrameSize()` 범위에서 `getCellSymbol()`을 조회한다.
 - `getItemCells()` / `getBoardItemCells()`는 부착형 아이템 한 칸의 상대 / 절대 좌표 복사본.
   일반 블록 및 무게추는 부착 칸이 없으므로 빈 배열이다. 무게추 전체 좌표는 `getBoardCells()` 사용.
 - `getCellSymbol(localX, localY)`는 L/F/B/M, 일반 칸 O, 빈칸 '.'을 반환한다.
@@ -46,7 +51,40 @@ Block line = factory.create(true, selectedType, ItemType.LINE_CLEAR, spawnX, spa
 Game의 Next/Hold가 현재 `TetrominoType`만 저장하므로 아이템 종류와 부착 위치를 보존하려면
 추가 연결 설계가 필요하다. Game/Board/UI 파일은 이번 작업에서 수정하지 않았다.
 
-## 검증
+## 시계 방향 SRS 회전 연결
+
+`rotate()`와 `previewRotation()`은 기존처럼 시계 방향 90도이며, 이제 고정 회전축을 사용한다.
+J/L/S/T/Z의 중심은 (1,1), I의 중심은 (1.5,1.5)다.
+`getRotationState()`는 0/R/2/L에 대응하는 0/1/2/3을 반환한다.
+O와 무게추는 모양과 아이템 위치를 유지하며 회전 상태 0, 보정 후보 한 개만 제공한다.
+반시계 방향 회전 및 180도 단일 회전은 이번 API에 포함하지 않았다.
+
+`getRotationOffsets()`는 현재 상태에서 다음 상태로 회전할 때의 후보를 SRS 순서대로 반환한다.
+I는 별도 표를 사용하며, 원래 위치 (0,0)를 포함해 총 5후보다.
+문헌 표의 y는 위쪽 양수이므로 이 코드에서는 부호를 반대로 변환했다.
+보정량은 모두 회전 전 원점 기준이며 후보끼리 누적하지 않는다.
+
+보드 담당자가 연결할 예시(이 문서의 예시일 뿐 Board 파일은 변경하지 않았다):
+
+```java
+for (int i = 0; i < block.getRotationOffsets().length; i++) {
+    int[][] candidate = block.previewRotation(i); // 상태 불변, 절대 {x,y}
+    if (board.canPlace(candidate)) {             // 실제 Board API에 맞춰 연결
+        block.rotate(i);                        // 검증한 회전 및 보정량 함께 반영
+        break;
+    }
+}
+// 모두 실패하면 rotate를 호출하지 않는다. 위치/회전/아이템 상태가 모두 유지된다.
+```
+
+기존 `previewRotation()` → 검사 → `rotate()` 연결도 후보 0에 대해서는 가능하지만,
+벽 차기까지 사용하려면 보드가 위 후보 순회를 연결해야 한다.
+빈 프레임 부분이 벽/바닥 밖에 있어도 실제 점유 칸만 충돌 검사해야 한다.
+보드 위쪽의 음수 y를 허용할지는 보드/게임 담당자의 생성·충돌 정책을 따른다.
+
+회전/보정표 참고: [Tetris with Few Piece Types, 2절과 표 2·3](https://erikdemaine.org/papers/TetrisPieces_FUN2024/paper.pdf).
+
+## 검증 (아이템 구현 당시)
 
 Java 21로 패키지를 직접 컴파일하고 임시 검증 프로그램으로 다음을 확인했다.
 일반 7종의 4회 회전 복원, 일반 모드 생성 거부, 7종 x 5아이템 조합,
@@ -54,3 +92,24 @@ Java 21로 패키지를 직접 컴파일하고 임시 검증 프로그램으로 
 I의 네 칸 모두에 L 부착 가능, 10,000회 아이템 선택 분포.
 선택 결과는 선언 순서대로 2010 / 2029 / 2004 / 1998 / 1959회였다.
 이 검증은 저장소의 JUnit/Gradle 전체 테스트 실행 결과가 아니다.
+
+## SRS 재현 가능한 검증
+
+프로젝트 루트 PowerShell에서 실행한다. JDK 21 이상이 필요하며 Java 21 대상으로 컴파일한다.
+소스/클래스 임시 파일은 시스템 임시 디렉터리에만 생성하고 저장소 외부 파일을 변경하지 않는다.
+
+```powershell
+.\src\main\java\tetris\block\verify-srs.ps1 -JdkHome $env:JAVA_HOME
+```
+
+스크립트는 독립적으로 정의한 예상 모양과 문헌의 y-up 보정표를 사용해 다음을 검사한다.
+
+- 7종의 4회 회전 복원, 고정 원점, I 생성 행 및 시계 방향 예상 모양.
+- 두 보정표의 모든 시계 방향 전이 8행, 각 후보의 미리보기와 반영 결과.
+- 부착형 4종 x 기본 블록 7종 x 부착 위치 4곳의 회전 및 이동 추적.
+- 무게추 유지, 배열 복사 보호, 잘못된 후보 거부 시 상태 불변.
+- 검증용 경계 판정으로 벽 차기/바닥 차기 성공, 모든 후보 실패 시 상태 불변.
+- 일반 모드 아이템 생성 거부.
+
+JDK 25에서 `--release 21`로 컴파일하고 위 검증을 통과했다.
+Gradle 전체 테스트나 실제 Board/UI 통합 실행을 확인한 것은 아니다.
