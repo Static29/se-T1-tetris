@@ -16,6 +16,10 @@ public class PauseMenuView extends VBox {
     private boolean settingsOpen;
 
     public PauseMenuView(Runnable onResume, Runnable onMainMenu, Runnable onExit) {
+        this(onResume, onMainMenu, onExit, null);
+    }
+
+    public PauseMenuView(Runnable onResume, Runnable onMainMenu, Runnable onExit, Runnable onSettings) {
         setAlignment(Pos.CENTER);
         setStyle("-fx-background-color: #101010; -fx-border-color: white; -fx-padding: 24;");
         setMaxSize(440, 460);
@@ -40,6 +44,7 @@ public class PauseMenuView extends VBox {
                 switch (selectedIndex) {
                     case 0 -> onResume.run();
                     case 1 -> {
+                        if (onSettings != null) { onSettings.run(); break; }
                         settingsOpen = true;
                         content.setText("===== 설정 =====\n\n아직 준비 중인 기능입니다.\n게임은 일시정지 상태입니다.\n\nEnter / Esc: 이전 메뉴");
                     }
