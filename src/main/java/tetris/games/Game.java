@@ -4,6 +4,13 @@ import java.util.Objects;
 import java.util.function.Supplier;
 import java.util.random.RandomGenerator;
 import tetris.block.TetrominoType;
+import tetris.block.Block;
+import tetris.board.Board;
+import tetris.board.BlockRotation;
+import tetris.board.Cell;
+import tetris.board.Position;
+import tetris.score.ScorePolicy;
+import tetris.score.DeletionScorePolicy;
 
 public class Game {
     private final Supplier<TetrominoType> pieceSource;
@@ -12,14 +19,36 @@ public class Game {
     private TetrominoType nextType;
     private TetrominoType heldType;
     private boolean holdUsed;
+    private final Board board;
+    private Block currentBlock;
+    private int clearedLines;
+    private final GameSettings settings;
+    private final ScorePolicy scorePolicy;
+    private long score;
 
     public Game() {
-        this(defaultPieceSource());
+        this(GameSettings.DEFAULT);
+    }
+
+    public Game(GameSettings settings) {
+        this(defaultPieceSource(), new Board(), settings, new DeletionScorePolicy());
     }
 
     /** 생성기를 주입하여 테스트와 추후 팀원의 생성 로직 연결에 사용한다. */
     public Game(Supplier<TetrominoType> pieceSource) {
+        this(pieceSource, new Board());
+    }
+
+    public Game(Supplier<TetrominoType> pieceSource, Board board) {
+        this(pieceSource, board, GameSettings.DEFAULT, new DeletionScorePolicy());
+    }
+
+    public Game(Supplier<TetrominoType> pieceSource, Board board,
+                GameSettings settings, ScorePolicy scorePolicy) {
         this.pieceSource = Objects.requireNonNull(pieceSource);
+        this.board = Objects.requireNonNull(board);
+        this.settings = Objects.requireNonNull(settings);
+        this.scorePolicy = Objects.requireNonNull(scorePolicy);
     }
 
     private static Supplier<TetrominoType> defaultPieceSource() {
@@ -56,6 +85,7 @@ public class Game {
             currentType = first;
             nextType = second;
             state = GameState.RUNNING;
+            spawnCurrent();
         }
     }
 
@@ -74,6 +104,7 @@ public class Game {
         }
         heldType = previous;
         holdUsed = true;
+        spawnCurrent();
         return true;
     }
 
@@ -89,7 +120,87 @@ public class Game {
         currentType = nextType;
         nextType = upcoming;
         holdUsed = false;
+        spawnCurrent();
         return true;
+    }
+
+    private void spawnCurrent() {
+        currentBlock = new Block(currentType);
+        currentBlock.move((board.getColumns() - currentBlock.getFrameSize()) / 2, 0);
+        if (board.isBlockOut(Position.fromXY(currentBlock.getBoardCells()))) {
+            state = GameState.GAME_OVER;
+        }
+    }
+
+    public int getClearedLines() { return clearedLines; }
+    public long getScore() { return score; }
+    public GameSettings getSettings() { return settings; }
+    public Difficulty getDifficulty() { return settings.difficulty(); }
+
+    /** 아이템 담당이 실제 삭제한 고유 칸 수를 한 번 전달한다. 줄 삭제 칸은 제외한다. */
+    public void recordItemCellsRemoved(int count) {
+        if (count < 0) throw new IllegalArgumentException("삭제 칸 수는 음수일 수 없습니다.");
+        if (state == GameState.RUNNING) score += scorePolicy.removedCells(count, getDifficulty());
+    }
+
+    /** 화면용 복사본에만 낙하 중 블록을 합성한다. 숨겨진 행은 제외한다. */
+    public Cell[][] getVisibleCells() {
+        Cell[][] cells = board.getVisibleCells();
+        if (currentBlock != null && state != GameState.GAME_OVER) {
+            for (Position p : Position.fromXY(currentBlock.getBoardCells())) {
+                if (board.isVisibleRow(p.row())) {
+                    cells[p.row() - board.getBufferRows()][p.col()] = Cell.valueOf(currentType.name());
+                }
+            }
+        }
+        return cells;
+    }
+
+    public boolean moveLeft() { return tryMove(-1, 0); }
+    public boolean moveRight() { return tryMove(1, 0); }
+
+    private boolean tryMove(int dx, int dy) {
+        if (state != GameState.RUNNING
+                || !board.canPlace(Position.fromXY(currentBlock.previewMove(dx, dy)))) {
+            return false;
+        }
+        currentBlock.move(dx, dy);
+        return true;
+    }
+
+    public boolean rotateClockwise() {
+        return state == GameState.RUNNING && BlockRotation.tryRotate(board, currentBlock);
+    }
+
+    /** 자동 하강과 소프트 드롭 공용. 아래가 막히면 즉시 고정한다. */
+    public boolean softDrop() {
+        if (state != GameState.RUNNING) return false;
+        if (tryMove(0, 1)) return true;
+        lockCurrent();
+        return false;
+    }
+
+    public void tick() { softDrop(); }
+
+    public int hardDrop() {
+        if (state != GameState.RUNNING) return 0;
+        int distance = 0;
+        while (tryMove(0, 1)) distance++;
+        lockCurrent();
+        return distance;
+    }
+
+    private void lockCurrent() {
+        var positions = Position.fromXY(currentBlock.getBoardCells());
+        board.lock(positions, Cell.valueOf(currentType.name()));
+        if (board.isLockOut(positions)) {
+            state = GameState.GAME_OVER;
+            return;
+        }
+        int rows = board.clearFullRows().size();
+        clearedLines += rows;
+        score += scorePolicy.clearedRows(rows, getDifficulty());
+        advanceAfterLock();
     }
 
     private TetrominoType drawPiece() {

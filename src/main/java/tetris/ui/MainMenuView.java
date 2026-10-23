@@ -1,6 +1,9 @@
 package tetris.ui;
 
 import java.util.List;
+import java.util.Objects;
+import tetris.games.Difficulty;
+import tetris.games.GameMode;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.input.KeyCode;
@@ -16,6 +19,8 @@ public class MainMenuView extends VBox {
     private final List<MenuItem> items;
     private final Text content = new Text();
     private int selectedIndex;
+    private Difficulty difficulty = Difficulty.NORMAL;
+    private GameMode mode = GameMode.CLASSIC;
 
     public MainMenuView(Runnable onStart, Runnable onSettings,
                         Runnable onLeaderboard, Runnable onExit) {
@@ -46,8 +51,20 @@ public class MainMenuView extends VBox {
         });
     }
 
+    public void setDifficulty(Difficulty difficulty) {
+        this.difficulty = Objects.requireNonNull(difficulty);
+        updateText();
+    }
+
+    public void setMode(GameMode mode) {
+        this.mode = Objects.requireNonNull(mode);
+        updateText();
+    }
+
     private void updateText() {
         StringBuilder text = new StringBuilder("===== TETRIS =====\n\n");
+        text.append("현재 난이도: ").append(difficulty.getLabel()).append("\n\n");
+        text.append("게임 모드: ").append(mode.getLabel()).append("\n\n");
         for (int i = 0; i < items.size(); i++) {
             text.append(i == selectedIndex ? "> " : "  ")
                     .append(items.get(i).title()).append("\n\n");
