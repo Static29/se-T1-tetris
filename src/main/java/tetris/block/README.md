@@ -81,8 +81,9 @@ Block line = factory.create(true, selectedType, ItemType.LINE_CLEAR, spawnX, spa
 효과 적용, 점수 계산, 무게추 접촉 상태와 좌우 제한은 이 패키지에서 처리하지 않는다.
 특히 B의 대상이 4칸보다 적을 때의 처리 규칙/담당은 미정이다.
 
-Game의 Next/Hold가 현재 `TetrominoType`만 저장하므로 아이템 종류와 부착 위치를 보존하려면
-추가 연결 설계가 필요하다. Game/Board/UI 파일은 이번 작업에서 수정하지 않았다.
+Game의 현재/Next/Hold는 `Block`을 저장하며 아이템 종류와 부착 칸을 보존한다.
+`copy()`는 현재 회전·위치를 보존하고 `spawnCopy(x, y)`는 아이템을 유지한 채 생성 방향으로 초기화한다.
+UI는 Block의 실제 칸·표시 문자를 사용한다. 자동 아이템 생성 시점과 보드 효과는 추가 연결 대상이다.
 
 ## 시계 방향 SRS 회전 연결
 

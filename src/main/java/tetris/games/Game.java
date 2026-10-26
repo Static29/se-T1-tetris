@@ -14,11 +14,10 @@ import tetris.score.ScorePolicy;
 import tetris.score.DeletionScorePolicy;
 
 public class Game {
-    private final Supplier<TetrominoType> pieceSource;
+    private final Supplier<Block> pieceSource;
     private GameState state = GameState.READY;
-    private TetrominoType currentType;
-    private TetrominoType nextType;
-    private TetrominoType heldType;
+    private Block nextBlock;
+    private Block heldBlock;
     private boolean holdUsed;
     private final Board board;
     private Block currentBlock;
@@ -47,6 +46,12 @@ public class Game {
 
     public Game(Supplier<TetrominoType> pieceSource, Board board,
                 GameSettings settings, ScorePolicy scorePolicy) {
+        this(board, adaptTypes(pieceSource), settings, scorePolicy);
+    }
+
+    /** 아이템을 포함한 완성된 Block 생성기를 연결한다. 전달된 객체는 복사해 소유한다. */
+    public Game(Board board, Supplier<Block> pieceSource,
+                GameSettings settings, ScorePolicy scorePolicy) {
         this.pieceSource = Objects.requireNonNull(pieceSource);
         this.board = Objects.requireNonNull(board);
         this.settings = Objects.requireNonNull(settings);
@@ -58,6 +63,11 @@ public class Game {
         });
     }
 
+    private static Supplier<Block> adaptTypes(Supplier<TetrominoType> source) {
+        Objects.requireNonNull(source);
+        return () -> new Block(Objects.requireNonNull(source.get(), "블록 종류는 null일 수 없습니다."));
+    }
+
     private static Supplier<TetrominoType> defaultPieceSource() {
         RandomGenerator random = RandomGenerator.getDefault();
         TetrominoType[] types = TetrominoType.values();
@@ -66,16 +76,20 @@ public class Game {
     }
 
     public TetrominoType getCurrentType() {
-        return currentType;
+        return currentBlock == null ? null : currentBlock.getType();
     }
 
     public TetrominoType getNextType() {
-        return nextType;
+        return nextBlock == null ? null : nextBlock.getType();
     }
 
     public TetrominoType getHeldType() {
-        return heldType;
+        return heldBlock == null ? null : heldBlock.getType();
     }
+
+    public Block getCurrentBlock() { return currentBlock == null ? null : currentBlock.copy(); }
+    public Block getNextBlock() { return nextBlock == null ? null : nextBlock.copy(); }
+    public Block getHeldBlock() { return heldBlock == null ? null : heldBlock.copy(); }
 
     public boolean canHold() {
         return state == GameState.RUNNING && !holdUsed;
@@ -87,29 +101,29 @@ public class Game {
 
     public void start() {
         if (state == GameState.READY) {
-            TetrominoType first = drawPiece();
-            TetrominoType second = drawPiece();
-            currentType = first;
-            nextType = second;
+            Block first = drawPiece();
+            Block second = drawPiece();
+            currentBlock = first;
+            nextBlock = second;
             state = GameState.RUNNING;
             spawnCurrent();
         }
     }
 
-    /** 성공하면 새 currentType의 블록을 초기 위치·회전으로 생성해야 한다. */
+    /** 아이템 정보는 유지하면서 교환한 블록의 위치·회전만 초기화한다. */
     public boolean hold() {
         if (!canHold()) {
             return false;
         }
-        TetrominoType previous = currentType;
-        if (heldType == null) {
-            TetrominoType upcoming = drawPiece();
-            currentType = nextType;
-            nextType = upcoming;
+        Block previous = currentBlock.spawnCopy(0, 0);
+        if (heldBlock == null) {
+            Block upcoming = drawPiece();
+            currentBlock = nextBlock;
+            nextBlock = upcoming;
         } else {
-            currentType = heldType;
+            currentBlock = heldBlock;
         }
-        heldType = previous;
+        heldBlock = previous;
         holdUsed = true;
         spawnCurrent();
         return true;
@@ -123,17 +137,16 @@ public class Game {
         if (state != GameState.RUNNING) {
             return false;
         }
-        TetrominoType upcoming = drawPiece();
-        currentType = nextType;
-        nextType = upcoming;
+        Block upcoming = drawPiece();
+        currentBlock = nextBlock;
+        nextBlock = upcoming;
         holdUsed = false;
         spawnCurrent();
         return true;
     }
 
     private void spawnCurrent() {
-        currentBlock = new Block(currentType);
-        currentBlock.move((board.getColumns() - currentBlock.getFrameSize()) / 2, 0);
+        currentBlock = currentBlock.spawnCopy((board.getColumns() - currentBlock.getFrameSize()) / 2, 0);
         if (board.isBlockOut(Position.fromXY(currentBlock.getBoardCells()))) {
             state = GameState.GAME_OVER;
         }
@@ -160,7 +173,7 @@ public class Game {
         if (currentBlock != null && state != GameState.GAME_OVER) {
             for (Position p : Position.fromXY(currentBlock.getBoardCells())) {
                 if (board.isVisibleRow(p.row())) {
-                    cells[p.row() - board.getBufferRows()][p.col()] = Cell.valueOf(currentType.name());
+                    cells[p.row() - board.getBufferRows()][p.col()] = currentCell();
                 }
             }
         }
@@ -204,7 +217,7 @@ public class Game {
 
     private void lockCurrent() {
         var positions = Position.fromXY(currentBlock.getBoardCells());
-        board.lock(positions, Cell.valueOf(currentType.name()));
+        board.lock(positions, currentCell());
         if (board.isLockOut(positions)) {
             state = GameState.GAME_OVER;
             return;
@@ -215,8 +228,13 @@ public class Game {
         advanceAfterLock();
     }
 
-    private TetrominoType drawPiece() {
-        return Objects.requireNonNull(pieceSource.get(), "블록 생성 결과는 null일 수 없습니다.");
+    private Block drawPiece() {
+        return Objects.requireNonNull(pieceSource.get(), "블록 생성 결과는 null일 수 없습니다.").spawnCopy(0, 0);
+    }
+
+    private Cell currentCell() {
+        // 무게추에는 TetrominoType이 없다. 보드 효과 연결 전에는 일반 점유 칸으로 표시·고정한다.
+        return currentBlock.getType() == null ? Cell.O : Cell.valueOf(currentBlock.getType().name());
     }
 
     public void pause() {
