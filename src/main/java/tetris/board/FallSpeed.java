@@ -13,6 +13,8 @@ public final class FallSpeed {
     public static final int EASY_INCREASE_PERCENT = 80;
     public static final int NORMAL_INCREASE_PERCENT = 100;
     public static final int HARD_INCREASE_PERCENT = 120;
+    /** 무게추는 무거우므로 같은 레벨의 일반 블록보다 1.5배 빠르게 떨어진다(팀 결정). */
+    public static final int WEIGHT_SPEED_PERCENT = 150;
 
     private final int increasePercent;
 
@@ -41,5 +43,10 @@ public final class FallSpeed {
         long speedPercent = 100 + level * increasePercent;
         long interval = BASE_INTERVAL_MILLIS * 100 / speedPercent;
         return Math.max(MIN_INTERVAL_MILLIS, interval);
+    }
+
+    /** 무게추의 하강 간격. 일반 간격을 WEIGHT_SPEED_PERCENT / 100배 빠르게 한다(하한은 같음). */
+    public long getWeightIntervalMillis(int clearedLines) {
+        return Math.max(MIN_INTERVAL_MILLIS, getIntervalMillis(clearedLines) * 100 / WEIGHT_SPEED_PERCENT);
     }
 }
