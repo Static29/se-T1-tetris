@@ -17,16 +17,18 @@
 
 ## 난이도별 값
 
-| 난이도 | I형 가중치 (나머지 10) | 속도 증가 비율 | 레벨 1(10줄) 간격 |
+| 난이도 | I형 가중치 (나머지 10) | 레벨당 속도 배율 증가 | 레벨 1(10줄) 배율 / 간격 |
 | --- | --- | --- | --- |
-| Easy | `PieceSelector.EASY_I_WEIGHT` = 12 | `FallSpeed.EASY_INCREASE_PERCENT` = 80 | 555ms |
-| Normal | `NORMAL_I_WEIGHT` = 10 | `NORMAL_INCREASE_PERCENT` = 100 | 500ms |
-| Hard | `HARD_I_WEIGHT` = 8 | `HARD_INCREASE_PERCENT` = 120 | 454ms |
+| Easy | `PieceSelector.EASY_I_WEIGHT` = 12 | `FallSpeed.EASY_INCREASE_PERCENT` = 8 (+0.08) | x1.08 / 925ms |
+| Normal | `NORMAL_I_WEIGHT` = 10 | `NORMAL_INCREASE_PERCENT` = 10 (+0.1) | x1.1 / 909ms |
+| Hard | `HARD_I_WEIGHT` = 8 | `HARD_INCREASE_PERCENT` = 12 (+0.12) | x1.12 / 892ms |
 
 보드 패키지는 `tetris.games`를 import하지 않는다(games → board 단방향 유지).
 `Difficulty`에 위 두 값을 필드로 추가하거나 Game에서 switch로 변환하는 방식을 제안한다.
 
-속도 공식: 속도(칸/초) = 1 + 레벨 × 증가 비율 / 100, 간격 = 1000ms / 속도, 최소 50ms.
+속도 공식(2026-10-26 변경): 속도 배율 = 1 + 레벨 × 증가 비율 / 100 (normal: x1.0 → x1.1 → x1.2 …),
+간격 = 1000ms / 배율(소수점 버림), 최소 50ms. 화면 표시·점수에는 `fallSpeed.getSpeedMultiplier(clearedLines)`를 쓰면
+간격에서 거꾸로 계산할 때 생기는 오차(1000/909 = 1.1001) 없이 정확한 배율이 나온다.
 Req1의 "일정 수 이상 블록 생성 시 속도 증가"는 사용하지 않고 줄 삭제 기준만 사용한다(팀 결정).
 
 ## 연결 순서 (Game 기준)
