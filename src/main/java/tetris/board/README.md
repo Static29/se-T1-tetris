@@ -12,6 +12,8 @@
 | `FallSpeed` | 지운 줄 수 → 자동 하강 간격(ms). 1초에 1칸에서 시작, 10줄마다 레벨 상승 |
 | `LockDelay` | 바닥에 닿은 뒤 0.5초 고정 여유. 이동·회전 성공 시 다시 셈(블록당 최대 15회) |
 | `BlockRotation` | SRS 회전 후보 검사(기존) |
+| `BlockLocker` / `LockResult` | 고정 + 아이템 효과(L·F·B·M) + 줄 삭제를 한 번에 처리하고 점수 재료를 반환 |
+| `WeightMover` | 무게추 전용 이동(닿기 전까지만 좌우, 지나가며 칸 삭제, 바닥 착지) |
 
 ## 난이도별 값
 
@@ -100,6 +102,55 @@ if (!tryMove(0, 1)) lockDelay.onGrounded(gameTimeMillis);
 ```
 
 `isGrounded()`는 `!board.canPlace(Position.fromXY(currentBlock.previewMove(0, 1)))`.
+
+## 아이템 효과 (팀 결정 2026-10-26)
+
+| 아이템 | 효과 | 점수 재료 (`LockResult`) |
+| --- | --- | --- |
+| L 줄 삭제 | L이 있는 줄을 꽉 차지 않아도 1줄 삭제(위 줄이 내려옴) | `itemCellsRemoved` = 그 줄의 찬 칸 수, `itemRowsCleared` = 1 |
+| F 빈칸 채우기 | F 바로 아래 ~ 바닥까지 같은 열의 빈칸을 그 블록 종류로 채움 | 없음(채워서 줄이 차면 `fullRowsCleared`) |
+| B 폭탄 | B 칸은 항상 사라지고, 주변 8칸 중 찬 칸에서 최대 4개 무작위 삭제(구멍은 그대로) | `itemCellsRemoved` = B 포함 지운 칸 수 |
+| M 점수 배율 | 고정된 칸에 배율 표시. 줄 삭제·L·B로 사라지면 그 고정의 점수 전체 2배(중복 없음) | `multiplierApplied` |
+| 무게추 | 회전 불가, 닿기 전까지만 좌우 이동, 지나가며 아래 칸 삭제, 바닥 착지 후 고정 여유 적용, 1.5배 속도 | 지운 칸 0점. 그때 사라진 M도 배율 없음. 착지로 줄이 차면 일반 줄 점수 |
+
+L로 지운 줄도 아이템 등장 카운트와 속도 레벨에 합산한다: `LockResult.totalRowsCleared()`.
+
+### 고정 처리 (일반 블록·아이템 공통)
+
+```java
+BlockLocker locker = new BlockLocker(RandomGenerator.getDefault());
+
+LockResult result = locker.lock(board, currentBlock);   // 고정 → Lock out 검사 → 아이템 효과 → 꽉 찬 줄 삭제
+if (result.lockOut()) { state = GameState.GAME_OVER; return; }
+
+long gained = scorePolicy.clearedRows(result.fullRowsCleared(), difficulty)
+            + scorePolicy.removedCells(result.itemCellsRemoved(), difficulty);
+if (result.multiplierApplied()) gained *= 2;
+score += gained;
+
+clearedLines += result.totalRowsCleared();   // 속도 레벨
+spawner.onLinesCleared(result.totalRowsCleared());   // 아이템 등장 카운트
+```
+
+- 기존 `lockCurrent()`의 `board.lock` + `clearFullRows`를 위 한 줄로 바꾸면 된다.
+- 화면 표시용 칸 종류는 `BlockLocker.cellOf(block)`를 쓴다. 무게추는 `getType()`이 null이라
+  `Cell.valueOf(type.name())`이 실패하므로 `Cell.WEIGHT`가 필요하다(`Game.getVisibleCells` 포함).
+- M 칸 표시는 `board.isMultiplier(row, col)`로 조회한다(JavaFX 화면에서 표시).
+
+### 무게추 이동
+
+```java
+if (currentBlock.getItemType() == ItemType.WEIGHT) weightMover = new WeightMover(board, currentBlock);
+
+// 좌우: 닿은 뒤에는 false
+weightMover.tryMoveSideways(dx);
+// 자동 하강 간격: fallSpeed.getWeightIntervalMillis(clearedLines)
+if (!weightMover.stepDown()) lockDelay.onGrounded(gameTimeMillis);   // 바닥이면 고정 여유 시작
+// 바닥 판정(고정 여유용): weightMover.isOnFloor()
+// 하드 드롭: weightMover.dropToFloor(); 이후 locker.lock(board, currentBlock)
+```
+
+무게추는 일반 `tryMove(0, 1)`(canPlace) 대신 `stepDown()`을 써야 블록을 지우며 내려간다.
 
 ## 검증
 

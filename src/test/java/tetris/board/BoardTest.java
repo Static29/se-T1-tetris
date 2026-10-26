@@ -305,4 +305,77 @@ class BoardTest {
         board.lock(positions(2, 0), Cell.L);
         assertEquals("...\n---\n...\nL..\n", board.toString());
     }
+
+    @Test
+    void clearRowRemovesPartialRowAndMovesUpperRowsDown() {
+        Board board = new Board(4, 0, 3);
+        board.lock(positions(1, 1), Cell.T);
+        board.lock(positions(2, 0, 2, 2), Cell.J);
+        board.lock(positions(3, 0), Cell.I);
+        assertEquals(2, board.clearRow(2));
+        assertEquals(Cell.T, board.getCell(2, 1));
+        assertEquals(Cell.I, board.getCell(3, 0), "아래 줄은 그대로");
+        assertTrue(board.isEmpty(0, 1));
+        assertThrows(IndexOutOfBoundsException.class, () -> board.clearRow(4));
+    }
+
+    @Test
+    void removeCellsLeavesHolesWithoutGravityAndCountsOnlyFilledCells() {
+        Board board = new Board(3, 0, 3);
+        board.lock(positions(0, 1, 1, 1, 2, 1), Cell.I);
+        assertEquals(1, board.removeCells(positions(1, 1, 1, 0)));
+        assertTrue(board.isEmpty(1, 1));
+        assertEquals(Cell.I, board.getCell(0, 1), "위 칸은 내려오지 않는다");
+    }
+
+    @Test
+    void removeCellsWithOutsidePositionChangesNothing() {
+        Board board = new Board(3, 0, 3);
+        board.lock(positions(2, 0), Cell.I);
+        assertThrows(IllegalArgumentException.class, () -> board.removeCells(positions(2, 0, 3, 0)));
+        assertEquals(Cell.I, board.getCell(2, 0));
+    }
+
+    @Test
+    void multiplierMarkNeedsFilledCellAndDisappearsWithIt() {
+        Board board = new Board(3, 0, 3);
+        assertThrows(IllegalArgumentException.class, () -> board.markMultiplier(new Position(2, 0)));
+        assertThrows(IllegalArgumentException.class, () -> board.markMultiplier(new Position(5, 0)));
+        board.lock(positions(2, 0), Cell.T);
+        board.markMultiplier(new Position(2, 0));
+        assertTrue(board.isMultiplier(2, 0));
+        assertTrue(board.hasMultiplierInRow(2));
+        assertFalse(board.isMultiplier(9, 9));
+        board.removeCells(positions(2, 0));
+        assertFalse(board.isMultiplier(2, 0));
+        // 같은 칸에 새 블록이 고정되어도 이전 표시가 남지 않는다.
+        board.lock(positions(2, 0), Cell.J);
+        assertFalse(board.isMultiplier(2, 0));
+    }
+
+    @Test
+    void multiplierMarkMovesDownWithRows() {
+        Board board = new Board(3, 0, 3);
+        board.lock(positions(0, 1), Cell.T);
+        board.markMultiplier(new Position(0, 1));
+        fillRow(board, 2, Cell.J, -1);
+        board.clearFullRows();
+        assertTrue(board.isMultiplier(1, 1));
+        board.clearRow(2);
+        assertTrue(board.isMultiplier(2, 1));
+        assertFalse(board.isMultiplier(1, 1));
+    }
+
+    @Test
+    void copyAndClearHandleMultiplierMarks() {
+        Board board = new Board(3, 0, 3);
+        board.lock(positions(2, 2), Cell.T);
+        board.markMultiplier(new Position(2, 2));
+        Board copy = board.copy();
+        assertTrue(copy.isMultiplier(2, 2));
+        copy.removeCells(positions(2, 2));
+        assertTrue(board.isMultiplier(2, 2), "복사본을 바꿔도 원본은 그대로");
+        board.clear();
+        assertFalse(board.isMultiplier(2, 2));
+    }
 }

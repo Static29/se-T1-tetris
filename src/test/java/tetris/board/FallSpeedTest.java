@@ -46,6 +46,13 @@ class FallSpeedTest {
     }
 
     @Test
+    void weightFallsOneAndHalfTimesFaster() {
+        assertEquals(666, normal.getWeightIntervalMillis(0));
+        assertEquals(333, normal.getWeightIntervalMillis(10));
+        assertEquals(FallSpeed.MIN_INTERVAL_MILLIS, hard.getWeightIntervalMillis(10_000));
+    }
+
+    @Test
     void zeroPercentNeverSpeedsUp() {
         assertEquals(1_000, new FallSpeed(0).getIntervalMillis(500));
     }

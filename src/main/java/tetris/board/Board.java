@@ -23,6 +23,11 @@ public class Board {
     private final int bufferRows;
     private final int columns;
     private final Cell[][] cells;
+    /**
+     * 점수 배율(M) 아이템이 붙은 칸 표시. cells와 같은 [row][col] 모양이며,
+     * 줄이 지워져 내려갈 때 cells와 같은 줄 배열을 함께 옮겨 칸과 표시가 어긋나지 않게 한다.
+     */
+    private final boolean[][] multiplierMarks;
 
     /** 보이는 20줄, 숨겨진 버퍼 2줄, 10칸짜리 기본 보드를 만든다. */
     public Board() {
@@ -39,6 +44,7 @@ public class Board {
         this.bufferRows = bufferRows;
         this.columns = columns;
         this.cells = new Cell[bufferRows + visibleRows][];
+        this.multiplierMarks = new boolean[bufferRows + visibleRows][];
         // 생성자에서는 재정의될 수 있는 clear() 대신 private 메서드로 채운다.
         fillEmptyRows(0, cells.length);
     }
@@ -161,13 +167,80 @@ public class Board {
         int targetRow = cells.length - 1;
         for (int row = cells.length - 1; row >= 0; row--) {
             if (!fullRows.contains(row)) {
-                cells[targetRow] = cells[row];
+                moveRow(row, targetRow);
                 targetRow--;
             }
         }
         // 내려오고 남은 맨 위 0 ~ targetRow번 줄을 빈 줄로 채운다.
         fillEmptyRows(0, targetRow + 1);
         return fullRows;
+    }
+
+    /**
+     * 가득 차지 않았어도 row 한 줄을 지우고 그 위 줄들을 한 칸씩 내린다(줄 삭제 아이템용).
+     * 지운 줄에 있던 찬 칸 수를 반환한다.
+     */
+    public int clearRow(int row) {
+        checkRow(row);
+        int removedCells = countFilledCells(row);
+        for (int r = row; r > 0; r--) {
+            moveRow(r - 1, r);
+        }
+        fillEmptyRows(0, 1);
+        return removedCells;
+    }
+
+    /**
+     * 주어진 칸들을 빈칸으로 만든다. 위 칸을 내리지 않는다(폭탄·무게추용).
+     * 이미 빈칸인 좌표는 건너뛰며, 실제로 지운 칸 수를 반환한다. 보드 밖 좌표가 있으면 아무것도 지우지 않고 예외를 던진다.
+     */
+    public int removeCells(Collection<Position> positions) {
+        checkPositions(positions);
+        for (Position position : positions) {
+            if (!isInside(position)) {
+                throw new IllegalArgumentException("보드 밖 좌표는 지울 수 없습니다: " + position);
+            }
+        }
+        int removed = 0;
+        for (Position position : positions) {
+            if (!cells[position.row()][position.col()].isEmpty()) {
+                cells[position.row()][position.col()] = Cell.EMPTY;
+                multiplierMarks[position.row()][position.col()] = false;
+                removed++;
+            }
+        }
+        return removed;
+    }
+
+    /** 이미 고정된 칸에 점수 배율(M) 표시를 붙인다. 빈칸이나 보드 밖이면 예외를 던진다. */
+    public void markMultiplier(Position position) {
+        Objects.requireNonNull(position, "position");
+        // isEmpty는 보드 밖을 벽(false)으로 보므로 보드 밖 검사를 따로 한다.
+        if (!isInside(position) || isEmpty(position)) {
+            throw new IllegalArgumentException("빈칸이나 보드 밖에는 배율 표시를 붙일 수 없습니다: " + position);
+        }
+        multiplierMarks[position.row()][position.col()] = true;
+    }
+
+    /** 점수 배율(M) 표시가 있는 칸인지. 보드 밖은 false. */
+    public boolean isMultiplier(int row, int col) {
+        return isInside(row, col) && multiplierMarks[row][col];
+    }
+
+    public boolean isMultiplier(Position position) {
+        Objects.requireNonNull(position, "position");
+        return isMultiplier(position.row(), position.col());
+    }
+
+    /** row 줄에 점수 배율(M) 표시가 하나라도 있는지. */
+    public boolean hasMultiplierInRow(int row) {
+        checkRow(row);
+        for (boolean mark : multiplierMarks[row]) {
+            if (mark) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** 모든 칸을 비운다. 새 게임을 시작할 때 사용한다. */
@@ -180,6 +253,7 @@ public class Board {
         Board result = new Board(visibleRows, bufferRows, columns);
         for (int row = 0; row < cells.length; row++) {
             result.cells[row] = cells[row].clone();
+            result.multiplierMarks[row] = multiplierMarks[row].clone();
         }
         return result;
     }
@@ -222,7 +296,24 @@ public class Board {
     private void fillEmptyRows(int fromRow, int toRowExclusive) {
         for (int row = fromRow; row < toRowExclusive; row++) {
             cells[row] = emptyRow();
+            multiplierMarks[row] = new boolean[columns];
         }
+    }
+
+    /** fromRow 줄을 toRow 자리로 옮긴다. 칸과 배율 표시를 항상 함께 옮긴다. */
+    private void moveRow(int fromRow, int toRow) {
+        cells[toRow] = cells[fromRow];
+        multiplierMarks[toRow] = multiplierMarks[fromRow];
+    }
+
+    private int countFilledCells(int row) {
+        int count = 0;
+        for (Cell cell : cells[row]) {
+            if (!cell.isEmpty()) {
+                count++;
+            }
+        }
+        return count;
     }
 
     /** 버퍼를 포함한 보드 줄 범위 안인지. isInside·isVisibleRow·checkRow가 같은 기준을 쓰게 한다. */
