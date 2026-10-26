@@ -11,7 +11,7 @@ class ScoreIntegrationTest {
     @Test
     void deletionTableAndDifficultyMultipliers() {
         ScorePolicy policy = new DeletionScorePolicy();
-        long[][] expected = {{0, 80, 160, 240, 480}, {0, 100, 200, 300, 600}, {0, 120, 240, 360, 720}};
+        long[][] expected = {{0, 800, 1600, 2400, 4800}, {0, 1000, 2000, 3000, 6000}, {0, 1200, 2400, 3600, 7200}};
         for (Difficulty d : Difficulty.values()) {
             for (int lines = 0; lines <= 4; lines++) assertEquals(expected[d.ordinal()][lines], policy.clearedRows(lines, d));
         }
@@ -23,13 +23,13 @@ class ScoreIntegrationTest {
     }
 
     @Test
-    void allDropMethodsGiveZeroWithoutDeletions() {
+    void allDropMethodsRewardOnlyActualDownwardDistance() {
         Game game = new Game(() -> T);
         game.start();
         game.tick();
         game.softDrop();
-        game.hardDrop();
-        assertEquals(0, game.getScore());
+        int distance = game.hardDrop();
+        assertEquals((2 + distance) * 10, game.getScore());
     }
 
     @Test
@@ -44,9 +44,9 @@ class ScoreIntegrationTest {
             Game game = new Game(() -> I, board, new GameSettings(d, false), new DeletionScorePolicy());
             game.start();
             assertTrue(game.rotateClockwise());
-            game.hardDrop();
+            int distance = game.hardDrop();
             assertEquals(4, game.getClearedLines());
-            assertEquals(d.applyScore(600), game.getScore());
+            assertEquals(d.applyScore(6000 + distance * 10), game.getScore());
         }
     }
 

@@ -6,4 +6,13 @@ import tetris.games.Difficulty;
 public interface ScorePolicy {
     long removedCells(int count, Difficulty difficulty);
     long clearedRows(int count, Difficulty difficulty);
+    default long removedCells(int count, Difficulty difficulty, double speedMultiplier) {
+        return removedCells(count, difficulty);
+    }
+    default long clearedRows(int count, Difficulty difficulty, double speedMultiplier) {
+        return clearedRows(count, difficulty);
+    }
+    default long descendedCells(int count, Difficulty difficulty, double speedMultiplier) {
+        return 0;
+    }
 }

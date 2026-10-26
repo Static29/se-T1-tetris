@@ -23,19 +23,15 @@ public class PiecePreviewView extends VBox {
     }
 
     public void showPiece(TetrominoType type) {
-        shape.setText(format(type));
-        shape.setFill(type == null ? Color.GRAY : switch (type) {
-            case I -> Color.CYAN;
-            case O -> Color.YELLOW;
-            case T -> Color.VIOLET;
-            case S -> Color.LIME;
-            case Z -> Color.SALMON;
-            case J -> Color.CORNFLOWERBLUE;
-            case L -> Color.ORANGE;
-        });
+        showPiece(type, false);
     }
 
-    /** 종류별 글자로 구분하며, {x,y}를 [row=y][col=x]로 변환한다. */
+    public void showPiece(TetrominoType type, boolean colorBlindMode) {
+        shape.setText(format(type));
+        shape.setFill(type == null ? Color.GRAY : Color.web(type.getColorHex(colorBlindMode)));
+    }
+
+    /** 일반 칸은 O로 통일하며, {x,y}를 [row=y][col=x]로 변환한다. */
     public static String format(TetrominoType type) {
         char[][] grid = new char[4][4];
         for (char[] row : grid) {
@@ -43,7 +39,7 @@ public class PiecePreviewView extends VBox {
         }
         if (type != null) {
             for (int[] cell : type.getCells()) {
-                grid[cell[1]][cell[0]] = type.name().charAt(0);
+                grid[cell[1]][cell[0]] = 'O';
             }
         }
         StringBuilder text = new StringBuilder("+---------+\n");

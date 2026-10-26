@@ -44,6 +44,18 @@ public final class LeaderboardStore {
             entries.stream().filter(e -> e.mode() == mode).limit(LIMIT).forEach(retained::add);
         }
         entries = retained;
+        save(entries);
+        return List.copyOf(entries);
+    }
+
+    public void clear(GameMode mode) throws IOException {
+        Objects.requireNonNull(mode);
+        save(load().stream().filter(e -> e.mode() != mode).toList());
+    }
+
+    public void clearAll() throws IOException { save(List.of()); }
+
+    private void save(List<LeaderboardEntry> entries) throws IOException {
         Properties values = new Properties();
         values.setProperty("count", Integer.toString(entries.size()));
         for (int i = 0; i < entries.size(); i++) {
@@ -56,6 +68,5 @@ public final class LeaderboardStore {
             values.setProperty(key + "mode", e.mode().name());
         }
         PropertyFiles.write(path, values);
-        return List.copyOf(entries);
     }
 }

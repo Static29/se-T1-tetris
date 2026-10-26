@@ -63,6 +63,8 @@ class ScoreViewsTest {
         assertNull(saved.get());
         press(view, KeyCode.DOWN);
         press(view, KeyCode.DOWN);
+        press(view, KeyCode.DOWN);
+        press(view, KeyCode.DOWN);
         press(view, KeyCode.ENTER);
         assertEquals(new GameSettings(Difficulty.HARD, true), saved.get());
         assertEquals(1, backs.get());
