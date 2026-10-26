@@ -21,11 +21,17 @@ public final class WeightMover {
     private int erasedCellCount;
 
     public WeightMover(Board board, Block weight) {
+        this(board, weight, false);
+    }
+
+    /** Hold 후에도 최초 접촉에 따른 좌우 제한은 유지한다. */
+    public WeightMover(Board board, Block weight, boolean previouslyTouched) {
         this.board = Objects.requireNonNull(board, "board");
         this.weight = Objects.requireNonNull(weight, "weight");
         if (weight.getItemType() != ItemType.WEIGHT) {
             throw new IllegalArgumentException("무게추 블록만 WeightMover로 움직일 수 있습니다.");
         }
+        this.touched = previouslyTouched;
         updateTouched();
     }
 

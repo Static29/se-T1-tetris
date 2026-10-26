@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.random.RandomGenerator;
+import java.util.function.Consumer;
 import tetris.block.Block;
 import tetris.block.ItemType;
 
@@ -42,7 +43,12 @@ public final class BlockLocker {
 
     /** 블록의 현재 위치에 고정하고 아이템 효과·줄 삭제를 적용한다. 놓을 수 없는 위치면 아무것도 바꾸지 않고 예외를 던진다. */
     public LockResult lock(Board board, Block block) {
+        return lock(board, block, effect -> { });
+    }
+
+    public LockResult lock(Board board, Block block, Consumer<LineClearEffect> effects) {
         Objects.requireNonNull(board, "board");
+        Objects.requireNonNull(effects, "effects");
         Cell cell = cellOf(block);
         List<Position> positions = Position.fromXY(block.getBoardCells());
         board.lock(positions, cell);
@@ -59,6 +65,7 @@ public final class BlockLocker {
             switch (block.getItemType()) {
                 case LINE_CLEAR -> {
                     multiplierApplied = board.hasMultiplierInRow(item.row());
+                    effects.accept(new LineClearEffect(board.getVisibleCells(), List.of(item.row())));
                     itemCellsRemoved = board.clearRow(item.row());
                     itemRowsCleared = 1;
                 }
@@ -73,11 +80,13 @@ public final class BlockLocker {
             }
         }
 
-        for (int row : board.findFullRows()) {
+        List<Integer> fullRows = board.findFullRows();
+        for (int row : fullRows) {
             if (board.hasMultiplierInRow(row)) {
                 multiplierApplied = true;
             }
         }
+        if (!fullRows.isEmpty()) effects.accept(new LineClearEffect(board.getVisibleCells(), fullRows));
         int fullRowsCleared = board.clearFullRows().size();
         return new LockResult(false, fullRowsCleared, itemRowsCleared, itemCellsRemoved, multiplierApplied);
     }

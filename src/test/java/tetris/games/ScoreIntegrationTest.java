@@ -19,7 +19,8 @@ class ScoreIntegrationTest {
         assertEquals(40, policy.removedCells(4, Difficulty.NORMAL));
         assertEquals(48, policy.removedCells(4, Difficulty.HARD));
         assertThrows(IllegalArgumentException.class, () -> policy.removedCells(-1, Difficulty.NORMAL));
-        assertThrows(IllegalArgumentException.class, () -> policy.clearedRows(5, Difficulty.NORMAL));
+        assertEquals(7000, policy.clearedRows(5, Difficulty.NORMAL));
+        assertThrows(IllegalArgumentException.class, () -> policy.clearedRows(-1, Difficulty.NORMAL));
     }
 
     @Test

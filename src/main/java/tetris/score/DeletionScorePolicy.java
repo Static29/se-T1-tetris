@@ -19,13 +19,14 @@ public final class DeletionScorePolicy implements ScorePolicy {
     }
     @Override
     public long clearedRows(int count, Difficulty difficulty, double speedMultiplier) {
-        if (count < 0 || count > 4) throw new IllegalArgumentException("한 번의 줄 삭제는 0~4줄입니다.");
+        if (count < 0) throw new IllegalArgumentException("삭제 줄 수는 음수일 수 없습니다.");
         long base = switch (count) {
             case 0 -> 0;
             case 1 -> 100;
             case 2 -> 200;
             case 3 -> 300;
-            default -> 600;
+            // F 아이템으로 5줄 이상 삭제하면 초과 줄마다 기본 1000점을 더한다.
+            default -> 600L + (count - 4L) * 100;
         };
         return adjusted(base * 10, difficulty, speedMultiplier);
     }

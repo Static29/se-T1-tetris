@@ -37,6 +37,7 @@ class GameplayPreferencesTest {
             for (int col = 0; col < 10; col++)
                 if (col < 3 || col > 6) board.lock(List.of(new Position(21, col)), Cell.J);
             game.hardDrop();
+            game.advanceTime(Game.LINE_CLEAR_MILLIS);
         }
         assertEquals(10, game.getClearedLines());
         assertEquals(500, game.getFallIntervalMillis());

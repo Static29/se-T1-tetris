@@ -1,8 +1,6 @@
 package tetris.ui;
 
-import javafx.animation.KeyFrame;
-import javafx.animation.Timeline;
-import javafx.util.Duration;
+import javafx.animation.AnimationTimer;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.input.KeyCode;
@@ -29,7 +27,9 @@ public class GameView extends StackPane {
     private GameSettings controls;
     private final Text movementHint = createText("", 14);
     private final Text actionHint = createText("", 14);
-    private final Timeline gravity;
+    private final AnimationTimer gravity;
+    private long lastFrame;
+    private boolean clockRunning;
     private final InitialsEntryView.SubmitAction submitScore;
     private final Runnable skipScore;
     private InitialsEntryView initialsEntry;
@@ -44,13 +44,18 @@ public class GameView extends StackPane {
         this.controls = game.getSettings();
         this.submitScore = submitScore;
         this.skipScore = skipScore;
-        gravity = new Timeline(new KeyFrame(Duration.millis(1000), event -> {
-            game.tick();
-            refresh();
-        }));
-        gravity.setCycleCount(Timeline.INDEFINITE);
+        gravity = new AnimationTimer() {
+            @Override public void handle(long now) {
+                if (lastFrame != 0) {
+                    long elapsed = (now - lastFrame) / 1_000_000;
+                    lastFrame += elapsed * 1_000_000;
+                    game.advanceTime(elapsed);
+                    refresh();
+                } else lastFrame = now;
+            }
+        };
         sceneProperty().addListener((observable, oldScene, newScene) -> {
-            if (newScene == null) gravity.stop();
+            if (newScene == null) stopClock();
             else refresh();
         });
         setPadding(new Insets(24));
@@ -141,11 +146,12 @@ public class GameView extends StackPane {
                 + "\n\n난이도: " + game.getDifficulty().getLabel()
                 + "\n\n점수: " + game.getScore() + "\n\n삭제 줄: " + game.getClearedLines()
                 + "\n\n속도: " + String.format(java.util.Locale.ROOT, "%.2fx", game.getSpeedMultiplier()));
-        gravity.setRate(1000.0 / game.getFallIntervalMillis());
-        boardView.render(game.getVisibleCells(), controls.colorBlindMode());
-        if (game.getState() == GameState.RUNNING && getScene() != null) gravity.play();
-        else if (game.getState() == GameState.PAUSED) gravity.pause();
-        else gravity.stop();
+        boardView.render(game.getVisibleCells(), game.getVisibleSymbols(), game.getGhostCells(),
+                game.getFlashingVisibleRows(), game.isClearFlashOn(), controls.colorBlindMode());
+        if (getScene() != null && (game.getState() == GameState.RUNNING
+                || game.getState() == GameState.GAME_OVER && game.isClearingLines())) {
+            if (!clockRunning) { clockRunning = true; gravity.start(); }
+        } else stopClock();
         nextPreview.showBlock(game.getNextBlock(), controls.colorBlindMode());
         holdPreview.showBlock(game.getHeldBlock(), controls.colorBlindMode());
         movementHint.setText(key(GameAction.LEFT) + "/" + key(GameAction.RIGHT) + ": 이동   "
@@ -153,13 +159,21 @@ public class GameView extends StackPane {
         actionHint.setText(key(GameAction.HARD_DROP) + ": 즉시 낙하   " + key(GameAction.HOLD)
                 + ": Hold   " + key(GameAction.PAUSE) + ": 일시정지");
         holdHint.setText(game.canHold() ? key(GameAction.HOLD) + ": 보관 / 교환" :
+                game.getCurrentBlock() != null && game.getCurrentBlock().getItemType() == tetris.block.ItemType.WEIGHT
+                        ? "무게추는 Hold 불가" :
                 game.getState() == GameState.RUNNING
                         ? "고정 후 사용 가능" : "진행 중에만 사용");
-        if (game.getState() == GameState.GAME_OVER && initialsEntry == null) {
+        if (game.getState() == GameState.GAME_OVER && !game.isClearingLines() && initialsEntry == null) {
             initialsEntry = new InitialsEntryView(game.getScore(), game.getDifficulty(), submitScore, skipScore);
             getChildren().add(initialsEntry);
             initialsEntry.requestFocus();
         }
+    }
+
+    private void stopClock() {
+        gravity.stop();
+        clockRunning = false;
+        lastFrame = 0;
     }
 
     private static Text createText(String value, int size) {

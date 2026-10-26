@@ -90,6 +90,6 @@ public final class SettingsView extends VBox {
         StringBuilder text = new StringBuilder("===== 설정 =====\n\n");
         for (int i = 0; i < items.length; i++) text.append(i == selected ? "> " : "  ").append(items[i]).append("\n\n");
         content.setText(text + "↑/↓: 이동  ←/→ 또는 Enter: 변경\nEsc: 취소\n\n"
-                + "난이도·모드는 다음 게임부터 적용됩니다.\nItem 모드의 아이템 등장은 준비 중입니다.\n\n" + message);
+                + "난이도·모드는 다음 게임부터 적용됩니다.\nItem 모드에서는 10줄 삭제마다 아이템이 등장합니다.\n\n" + message);
     }
 }

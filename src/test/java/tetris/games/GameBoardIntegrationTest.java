@@ -99,6 +99,8 @@ class GameBoardIntegrationTest {
         game.start();
         assertEquals(20, game.hardDrop());
         assertEquals(1, game.getClearedLines());
+        assertFalse(game.canHold());
+        game.advanceTime(Game.LINE_CLEAR_MILLIS);
         assertTrue(game.canHold());
         for (Cell[] row : board.getVisibleCells()) {
             for (Cell cell : row) assertEquals(Cell.EMPTY, cell);
@@ -143,6 +145,7 @@ class GameBoardIntegrationTest {
         Game game = new Game(() -> T, board);
         game.start();
         assertFalse(game.softDrop());
+        game.advanceTime(500);
         assertEquals(GameState.GAME_OVER, game.getState());
         assertTrue(board.isRowFull(2));
         assertEquals(0, game.getClearedLines());
