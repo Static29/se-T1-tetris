@@ -9,6 +9,7 @@ import tetris.board.Board;
 import tetris.board.BlockRotation;
 import tetris.board.Cell;
 import tetris.board.Position;
+import tetris.board.FallSpeed;
 import tetris.score.ScorePolicy;
 import tetris.score.DeletionScorePolicy;
 
@@ -25,6 +26,7 @@ public class Game {
     private final GameSettings settings;
     private final ScorePolicy scorePolicy;
     private long score;
+    private final FallSpeed fallSpeed;
 
     public Game() {
         this(GameSettings.DEFAULT);
@@ -49,6 +51,11 @@ public class Game {
         this.board = Objects.requireNonNull(board);
         this.settings = Objects.requireNonNull(settings);
         this.scorePolicy = Objects.requireNonNull(scorePolicy);
+        this.fallSpeed = new FallSpeed(switch (settings.difficulty()) {
+            case EASY -> FallSpeed.EASY_INCREASE_PERCENT;
+            case NORMAL -> FallSpeed.NORMAL_INCREASE_PERCENT;
+            case HARD -> FallSpeed.HARD_INCREASE_PERCENT;
+        });
     }
 
     private static Supplier<TetrominoType> defaultPieceSource() {
@@ -136,11 +143,15 @@ public class Game {
     public long getScore() { return score; }
     public GameSettings getSettings() { return settings; }
     public Difficulty getDifficulty() { return settings.difficulty(); }
+    public long getFallIntervalMillis() { return fallSpeed.getIntervalMillis(clearedLines); }
+    public double getSpeedMultiplier() {
+        return (double) FallSpeed.BASE_INTERVAL_MILLIS / getFallIntervalMillis();
+    }
 
     /** 아이템 담당이 실제 삭제한 고유 칸 수를 한 번 전달한다. 줄 삭제 칸은 제외한다. */
     public void recordItemCellsRemoved(int count) {
         if (count < 0) throw new IllegalArgumentException("삭제 칸 수는 음수일 수 없습니다.");
-        if (state == GameState.RUNNING) score += scorePolicy.removedCells(count, getDifficulty());
+        if (state == GameState.RUNNING) score += scorePolicy.removedCells(count, getDifficulty(), getSpeedMultiplier());
     }
 
     /** 화면용 복사본에만 낙하 중 블록을 합성한다. 숨겨진 행은 제외한다. */
@@ -165,6 +176,7 @@ public class Game {
             return false;
         }
         currentBlock.move(dx, dy);
+        if (dy > 0) score += scorePolicy.descendedCells(dy, getDifficulty(), getSpeedMultiplier());
         return true;
     }
 
@@ -198,8 +210,8 @@ public class Game {
             return;
         }
         int rows = board.clearFullRows().size();
+        score += scorePolicy.clearedRows(rows, getDifficulty(), getSpeedMultiplier());
         clearedLines += rows;
-        score += scorePolicy.clearedRows(rows, getDifficulty());
         advanceAfterLock();
     }
 

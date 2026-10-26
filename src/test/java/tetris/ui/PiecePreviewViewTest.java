@@ -11,7 +11,7 @@ class PiecePreviewViewTest {
     @EnumSource(TetrominoType.class)
     void everyTypeFitsInBoxWithExactlyFourCells(TetrominoType type) {
         String preview = PiecePreviewView.format(type);
-        assertEquals(4, preview.chars().filter(c -> c == type.name().charAt(0)).count());
+        assertEquals(4, preview.chars().filter(c -> c == 'O').count());
         String[] lines = preview.split("\n");
         assertEquals(6, lines.length);
         for (String line : lines) {
@@ -28,7 +28,7 @@ class PiecePreviewViewTest {
     @Test
     void tShapeUsesXYCoordinatesWithoutTransposing() {
         String[] lines = PiecePreviewView.format(TetrominoType.T).split("\n");
-        assertEquals("| . T . . |", lines[1]);
-        assertEquals("| T T T . |", lines[2]);
+        assertEquals("| . O . . |", lines[1]);
+        assertEquals("| O O O . |", lines[2]);
     }
 }

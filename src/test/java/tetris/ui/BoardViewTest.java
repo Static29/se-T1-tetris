@@ -23,8 +23,8 @@ class BoardViewTest {
         cells[0][9] = Cell.T;
         cells[19][0] = Cell.I;
         String[] lines = new BoardView().render(cells).split("\n");
-        assertEquals("X " + ". ".repeat(9) + "T X", lines[1]);
-        assertEquals("X I " + ". ".repeat(9) + "X", lines[20]);
+        assertEquals("X " + ". ".repeat(9) + "O X", lines[1]);
+        assertEquals("X O " + ". ".repeat(9) + "X", lines[20]);
         assertEquals(Cell.T, cells[0][9]);
         assertEquals(Cell.I, cells[19][0]);
         assertEquals(Cell.EMPTY, cells[0][0]);

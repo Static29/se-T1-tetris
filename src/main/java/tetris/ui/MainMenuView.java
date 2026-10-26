@@ -62,7 +62,7 @@ public class MainMenuView extends VBox {
     }
 
     private void updateText() {
-        StringBuilder text = new StringBuilder("===== TETRIS =====\n\n");
+        StringBuilder text = new StringBuilder("===== T1 TETRIS =====\n\n");
         text.append("현재 난이도: ").append(difficulty.getLabel()).append("\n\n");
         text.append("게임 모드: ").append(mode.getLabel()).append("\n\n");
         for (int i = 0; i < items.size(); i++) {

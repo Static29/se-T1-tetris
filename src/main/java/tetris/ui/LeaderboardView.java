@@ -9,17 +9,36 @@ import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 import tetris.score.LeaderboardEntry;
 import tetris.games.GameMode;
+import java.io.IOException;
 
 public final class LeaderboardView extends VBox {
+    @FunctionalInterface
+    public interface ResetAction {
+        List<LeaderboardEntry> reset(GameMode mode, boolean all) throws IOException;
+    }
     private GameMode mode;
+    private List<LeaderboardEntry> currentEntries;
+    private String notice;
+    private boolean confirming;
+    private boolean resetAll;
     public LeaderboardView(List<LeaderboardEntry> entries, UUID recentId, String message, Runnable back) {
         this(entries, recentId, message, GameMode.CLASSIC, back);
     }
     public LeaderboardView(List<LeaderboardEntry> entries, UUID recentId, String message, GameMode initialMode, Runnable back) {
+        this(entries, recentId, message, initialMode, back, null);
+    }
+    public LeaderboardView(List<LeaderboardEntry> entries, UUID recentId, String message, GameMode initialMode,
+                           Runnable back, ResetAction reset) {
         mode = initialMode;
+        currentEntries = List.copyOf(entries);
+        notice = message;
         Text content = new Text();
-        Runnable render = () -> content.setText(format(entries, recentId, mode) + "\n" + message
-                + "\n← / →: Classic / Item 전환\nEnter / Esc: 메뉴로 돌아가기");
+        Runnable render = () -> content.setText(confirming
+                ? "===== 기록 초기화 =====\n\n" + (resetAll ? "Classic + Item 전체" : mode.getLabel())
+                    + " 기록을 삭제할까요?\n이 작업은 되돌릴 수 없습니다.\n\nEnter: 삭제  Esc: 취소"
+                : format(currentEntries, recentId, mode) + "\n" + notice
+                    + "\n← / →: Classic / Item 전환\nEnter / Esc: 메뉴로 돌아가기"
+                    + (reset == null ? "" : "\nDelete: 현재 모드 초기화  R: 전체 초기화"));
         render.run();
         content.setFont(Font.font("Monospaced", 18));
         content.setFill(Color.WHITESMOKE);
@@ -28,7 +47,26 @@ public final class LeaderboardView extends VBox {
         setFocusTraversable(true);
         getChildren().add(content);
         setOnKeyPressed(event -> {
+            if (confirming) {
+                if (event.getCode() == javafx.scene.input.KeyCode.ESCAPE) confirming = false;
+                else if (event.getCode() == javafx.scene.input.KeyCode.ENTER) {
+                    try { currentEntries = reset.reset(mode, resetAll); notice = "기록을 초기화했습니다."; }
+                    catch (IOException e) { notice = "초기화하지 못했습니다. 다시 시도해 주세요."; }
+                    confirming = false;
+                }
+                render.run();
+                event.consume();
+                return;
+            }
             switch (event.getCode()) {
+                case DELETE, R -> {
+                    if (reset != null) {
+                        resetAll = event.getCode() == javafx.scene.input.KeyCode.R;
+                        confirming = true;
+                        render.run();
+                    }
+                    event.consume();
+                }
                 case LEFT, RIGHT -> {
                     mode = mode == GameMode.CLASSIC ? GameMode.ITEM : GameMode.CLASSIC;
                     render.run();

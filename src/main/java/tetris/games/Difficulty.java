@@ -9,5 +9,6 @@ public enum Difficulty {
         this.scorePercent = scorePercent;
     }
     public String getLabel() { return label; }
+    public int getScorePercent() { return scorePercent; }
     public long applyScore(long baseScore) { return baseScore * scorePercent / 100; }
 }

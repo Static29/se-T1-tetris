@@ -68,6 +68,8 @@ class GameModeTest {
         press(view, KeyCode.DOWN);
         press(view, KeyCode.RIGHT);
         press(view, KeyCode.DOWN);
+        press(view, KeyCode.DOWN);
+        press(view, KeyCode.DOWN);
         press(view, KeyCode.ENTER);
         assertEquals(GameMode.ITEM, saved.get().mode());
         var menu = new MainMenuView(() -> { }, () -> { }, () -> { }, () -> { });

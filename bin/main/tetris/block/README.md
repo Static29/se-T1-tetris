@@ -2,6 +2,39 @@
 
 `TetrominoType`은 기존 7종만 유지한다. 난이도별 가중치 및 기본 종류 선택은 Game 담당이다.
 
+## 일반 / 색각 보조 색상
+
+`TetrominoType`은 JavaFX/AWT 의존성 없이 `#RRGGBB` 문자열을 제공한다.
+일반 값은 기존 `PiecePreviewView`의 JavaFX 색상 상수와 같다.
+보조 값은 [Okabe-Ito Color Universal Design](https://jfly.uni-koeln.de/color/) 팔레트에서 선택했다.
+
+| 블록 | 일반 | 색각 보조 |
+| --- | --- | --- |
+| I | #00FFFF | #56B4E9 |
+| O | #FFFF00 | #F0E442 |
+| T | #EE82EE | #CC79A7 |
+| S | #00FF00 | #009E73 |
+| Z | #FA8072 | #D55E00 |
+| J | #6495ED | #0072B2 |
+| L | #FFA500 | #E69F00 |
+
+`getNormalColorHex()` / `getColorBlindColorHex()`로 각각 조회하거나
+`getColorHex(boolean colorBlindMode)`로 현재 모드에 맞는 값을 조회한다.
+모드 설정의 저장/전환은 Game/UI 담당이며 enum 상태를 변경하지 않는다.
+
+```java
+// UI 담당자의 연결 예시. 이 작업에서는 UI 파일을 수정하지 않았다.
+Color color = Color.web(type.getColorHex(colorBlindMode));
+```
+
+현재 UI의 switch 색상 코드를 위 조회로 바꿔야 실제 화면에 적용된다.
+보드/Next/Hold에도 같은 모드 값을 전달해야 한다.
+L/F/B/M은 기본 테트로미노 색상을 사용하고 기존 아이템 문자를 유지한다.
+무게추는 `getType()==null`인 별도 모양이므로 이 API를 직접 호출하지 말고 UI에서 별도 처리해야 한다.
+무게추 전용 색상은 이번에 정의하지 않았다.
+보조 팔레트만으로 모든 색각 유형에서 구분을 보장하지 않는다.
+문자·패턴 등 색상 외 식별 수단과 배경 대비는 UI 연결 후 함께 확인해야 한다.
+
 ## 생성
 
 ```java
