@@ -3,13 +3,15 @@
 
 ## 협업 기록
 
-매주 계획 → 구현·테스트 → 리뷰 → 회고 순서로 진행하고 기록합니다.
+실제 커밋·병합 날짜를 기준으로 3명의 담당 작업과 5개 개발 단계의 결과를 정리합니다.
+확인되지 않은 회의 일정이나 스프린트 기간은 추정하지 않습니다.
 
-- [주차별 Agile 운영 안내](docs/agile/README.md)
+- [날짜별 개발 진행 기록](docs/agile/README.md)
 - [팀 역할과 협업 경계](docs/agile/team.md)
 - [전체 작업 목록](docs/agile/backlog.md)
-- [주차별 기록 양식](docs/agile/week-template.md)
-- [2026-09-29 기준 진행 기록](docs/agile/weeks/2026-09-29.md)
+- [결정 및 문제 해결 기록](docs/agile/decisions.md)
+- [작업 결과 양식](docs/agile/templates/iteration.md)
+- [기록 근거와 용어](docs/agile/evidence.md)
 
 ## 개발 환경
 
@@ -38,7 +40,41 @@ Java 소스 파일은 UTF-8로 저장하고 컴파일합니다.
 .\gradlew.bat test
 ```
 
-이 명령은 개발용입니다. 최종 사용자용 실행 파일 패키징은 이후 진행합니다.
+## 테스트와 라인 커버리지
+
+```powershell
+.\gradlew.bat check
+```
+
+JUnit 테스트, JaCoCo 보고서 생성, 전체 LINE 커버리지 70% 기준 검증을 함께 실행합니다.
+기준 미달 시 `check`가 실패합니다. `test`만 실행해도 보고서는 생성되지만 70% 기준 검증은 `check`에서 수행합니다.
+모든 테스트를 강제로 다시 실행하려면 `check --rerun-tasks`를 사용합니다.
+
+- 커버리지 HTML: `build/reports/jacoco/test/html/index.html`
+- 커버리지 XML/CSV: `build/reports/jacoco/test/jacocoTestReport.xml`, `jacocoTestReport.csv`
+- 테스트 결과: `build/reports/tests/test/index.html`
+- 측정 범위: `src/main/java` 전체(UI·실행 진입점 포함), 임의 제외 없음
+- [측정 결과 및 제출 증거 안내](docs/testing-and-coverage.md)
+
+## Windows 실행파일 빌드·배포
+
+Windows JDK 21 환경에서 다음 명령을 실행하면 테스트 후 Java 런타임과 JavaFX를 포함한 배포본을 만듭니다.
+ZIP 생성 전에는 포함된 런타임으로 모든 모드·난이도의 게임 시작, 자동 하강, 일시정지, Hold·하드 드롭을 검증합니다.
+기본 난수 생성기에 필요한 `jdk.random` 모듈도 배포 런타임에 포함합니다.
+
+```powershell
+.\gradlew.bat packageWindowsZip
+```
+
+- 실행: `build/jpackage/T1 TETRIS/T1 TETRIS.exe` 더블클릭
+- 전달할 파일: `build/distributions/T1-TETRIS-windows.zip`
+- 받는 사람은 ZIP 전체를 압축 해제한 뒤 `T1 TETRIS.exe`를 실행합니다. Java/Gradle 설치가 필요 없습니다.
+- exe 하나만 옮기면 실행되지 않습니다. 옆의 `app`, `runtime` 폴더를 함께 유지해야 합니다.
+- 설치 마법사가 없는 휴대용 배포본이며, 빌드한 Windows/JDK와 같은 CPU 아키텍처를 대상으로 합니다.
+- 설정·리더보드는 기존처럼 사용자 홈의 `.tetris`에 저장되므로 배포 폴더를 교체해도 유지됩니다.
+- 빌드를 다시 하면 `build/jpackage/T1 TETRIS`의 이전 배포본만 교체합니다.
+- 빨간 블록 T1 아이콘은 `src/main/resources/tetris/icon.ico`(exe), `icon.png`(게임 창)를 사용합니다.
+  디자인 재생성 스크립트는 `scripts/create-icon.ps1`입니다.
 
 ## 현재 구현 범위
 

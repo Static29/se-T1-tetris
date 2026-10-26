@@ -8,6 +8,8 @@ import tetris.ui.ScreenController;
 public class Main extends Application {
     @Override
     public void start(Stage stage) {
+        stage.getIcons().add(new javafx.scene.image.Image(
+                java.util.Objects.requireNonNull(Main.class.getResourceAsStream("/tetris/icon.png"))));
         ScreenController controller = new ScreenController(stage);
         controller.showMainMenu();
         stage.show();

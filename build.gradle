@@ -1,5 +1,6 @@
 plugins {
     id 'application'
+    id 'jacoco'
     id 'org.openjfx.javafxplugin' version '0.1.0'
 }
 
@@ -19,7 +20,76 @@ javafx {
 }
 
 application {
-    mainClass = 'tetris.Main'
+    mainClass = 'tetris.Launcher'
+}
+
+// Windows 휴대용 배포: JavaFX와 Java 런타임을 포함한 exe 및 전체 폴더 ZIP.
+def packageInput = layout.buildDirectory.dir('jpackage-input')
+def packageOutput = layout.buildDirectory.dir('jpackage')
+def packagingJava = javaToolchains.launcherFor {
+    languageVersion = JavaLanguageVersion.of(21)
+}
+
+tasks.register('prepareWindowsPackage', Sync) {
+    dependsOn tasks.named('jar')
+    from(tasks.named('jar'))
+    from(configurations.runtimeClasspath)
+    into(packageInput)
+}
+
+tasks.register('packageWindows', Exec) {
+    group = 'distribution'
+    description = '런타임을 포함한 Windows T1 TETRIS.exe 폴더를 생성합니다.'
+    dependsOn tasks.named('test'), tasks.named('prepareWindowsPackage')
+    doFirst {
+        if (!System.getProperty('os.name').toLowerCase().contains('windows')) {
+            throw new GradleException('packageWindows는 Windows JDK 21에서 실행해야 합니다.')
+        }
+        delete(packageOutput.map { it.dir('T1 TETRIS') })
+        def jdk = packagingJava.get().metadata.installationPath.asFile
+        commandLine new File(jdk, 'bin/jpackage.exe').absolutePath,
+                '--type', 'app-image',
+                '--name', 'T1 TETRIS',
+                '--app-version', '1.0.0',
+                '--vendor', 'T1',
+                '--description', 'T1 TETRIS',
+                '--icon', file('src/main/resources/tetris/icon.ico').absolutePath,
+                '--input', packageInput.get().asFile.absolutePath,
+                '--dest', packageOutput.get().asFile.absolutePath,
+                '--main-jar', tasks.jar.archiveFileName.get(),
+                '--main-class', application.mainClass.get(),
+                '--java-options', '-Dfile.encoding=UTF-8',
+                '--add-modules', 'java.base,java.desktop,java.logging,java.xml,jdk.unsupported,jdk.unsupported.desktop,jdk.random',
+                '--jlink-options', '--strip-debug --no-man-pages --no-header-files'
+    }
+}
+
+tasks.register('packageWindowsZip', Zip) {
+    group = 'distribution'
+    description = '다른 Windows PC에 전달할 런타임 포함 ZIP을 생성합니다.'
+    dependsOn 'verifyWindowsPackage'
+    from(packageOutput) { include 'T1 TETRIS/**' }
+    destinationDirectory = layout.buildDirectory.dir('distributions')
+    archiveFileName = 'T1-TETRIS-windows.zip'
+}
+
+sourceSets {
+    packaging {
+        compileClasspath += sourceSets.main.output
+    }
+}
+
+tasks.register('verifyWindowsPackage', Exec) {
+    group = 'verification'
+    description = '배포본에 포함된 Java만 사용해 실제 게임 생성과 진행을 검증합니다.'
+    dependsOn tasks.named('packageWindows'), tasks.named('compilePackagingJava')
+    doFirst {
+        def image = packageOutput.get().dir('T1 TETRIS').asFile
+        commandLine new File(image, 'runtime/bin/java.exe').absolutePath,
+                '-Dfile.encoding=UTF-8', '-cp',
+                sourceSets.packaging.output.classesDirs.asPath + File.pathSeparator + new File(image, 'app/*').path,
+                'tetris.PackagingSmoke'
+    }
 }
 
 dependencies {
@@ -34,4 +104,37 @@ tasks.withType(JavaCompile).configureEach {
 
 test {
     useJUnitPlatform()
+    finalizedBy tasks.named('jacocoTestReport')
+}
+
+jacoco {
+    toolVersion = '0.8.13'
+}
+
+// main 전체(UI 포함)를 측정한다. 외부 라이브러리와 테스트 코드는 분모에 포함하지 않는다.
+jacocoTestReport {
+    dependsOn tasks.named('test')
+    reports {
+        html.required = true
+        xml.required = true
+        csv.required = true
+    }
+}
+
+jacocoTestCoverageVerification {
+    dependsOn tasks.named('jacocoTestReport')
+    violationRules {
+        rule {
+            element = 'BUNDLE'
+            limit {
+                counter = 'LINE'
+                value = 'COVEREDRATIO'
+                minimum = 0.70
+            }
+        }
+    }
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('jacocoTestCoverageVerification')
 }
