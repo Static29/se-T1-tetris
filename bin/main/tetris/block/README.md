@@ -2,6 +2,39 @@
 
 `TetrominoType`은 기존 7종만 유지한다. 난이도별 가중치 및 기본 종류 선택은 Game 담당이다.
 
+## 일반 / 색각 보조 색상
+
+`TetrominoType`은 JavaFX/AWT 의존성 없이 `#RRGGBB` 문자열을 제공한다.
+일반 값은 기존 `PiecePreviewView`의 JavaFX 색상 상수와 같다.
+보조 값은 [Okabe-Ito Color Universal Design](https://jfly.uni-koeln.de/color/) 팔레트에서 선택했다.
+
+| 블록 | 일반 | 색각 보조 |
+| --- | --- | --- |
+| I | #00FFFF | #56B4E9 |
+| O | #FFFF00 | #F0E442 |
+| T | #EE82EE | #CC79A7 |
+| S | #00FF00 | #009E73 |
+| Z | #FA8072 | #D55E00 |
+| J | #6495ED | #0072B2 |
+| L | #FFA500 | #E69F00 |
+
+`getNormalColorHex()` / `getColorBlindColorHex()`로 각각 조회하거나
+`getColorHex(boolean colorBlindMode)`로 현재 모드에 맞는 값을 조회한다.
+모드 설정의 저장/전환은 Game/UI 담당이며 enum 상태를 변경하지 않는다.
+
+```java
+// UI 담당자의 연결 예시. 이 작업에서는 UI 파일을 수정하지 않았다.
+Color color = Color.web(type.getColorHex(colorBlindMode));
+```
+
+현재 UI의 switch 색상 코드를 위 조회로 바꿔야 실제 화면에 적용된다.
+보드/Next/Hold에도 같은 모드 값을 전달해야 한다.
+L/F/B/M은 기본 테트로미노 색상을 사용하고 기존 아이템 문자를 유지한다.
+무게추는 `getType()==null`인 별도 모양이므로 이 API를 직접 호출하지 말고 UI에서 별도 처리해야 한다.
+무게추 전용 색상은 이번에 정의하지 않았다.
+보조 팔레트만으로 모든 색각 유형에서 구분을 보장하지 않는다.
+문자·패턴 등 색상 외 식별 수단과 배경 대비는 UI 연결 후 함께 확인해야 한다.
+
 ## 생성
 
 ```java
@@ -48,8 +81,9 @@ Block line = factory.create(true, selectedType, ItemType.LINE_CLEAR, spawnX, spa
 효과 적용, 점수 계산, 무게추 접촉 상태와 좌우 제한은 이 패키지에서 처리하지 않는다.
 특히 B의 대상이 4칸보다 적을 때의 처리 규칙/담당은 미정이다.
 
-Game의 Next/Hold가 현재 `TetrominoType`만 저장하므로 아이템 종류와 부착 위치를 보존하려면
-추가 연결 설계가 필요하다. Game/Board/UI 파일은 이번 작업에서 수정하지 않았다.
+Game의 현재/Next/Hold는 `Block`을 저장하며 아이템 종류와 부착 칸을 보존한다.
+`copy()`는 현재 회전·위치를 보존하고 `spawnCopy(x, y)`는 아이템을 유지한 채 생성 방향으로 초기화한다.
+UI는 Block의 실제 칸·표시 문자를 사용한다. 자동 아이템 생성 시점과 보드 효과는 추가 연결 대상이다.
 
 ## 시계 방향 SRS 회전 연결
 

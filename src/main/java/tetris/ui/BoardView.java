@@ -32,7 +32,7 @@ public class BoardView {
                 if (cell == null) {
                     throw new IllegalArgumentException("빈칸은 Cell.EMPTY로 전달해야 합니다.");
                 }
-                text.append(cell.isEmpty() ? '.' : cell.name().charAt(0)).append(' ');
+                text.append(cell.isEmpty() ? '.' : 'O').append(' ');
             }
             text.append("X\n");
         }
