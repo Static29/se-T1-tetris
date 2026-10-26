@@ -1,9 +1,9 @@
 package tetris.board;
 
 import java.util.Objects;
+import java.util.function.Supplier;
 import tetris.block.Block;
 import tetris.block.ItemBlockFactory;
-import tetris.block.TetrominoType;
 
 /**
  * 다음 블록(Next)을 미리 정해 두고, 요청하면 생성 위치에 놓아 내보낸다.
@@ -15,7 +15,7 @@ public final class BlockSpawner {
     public static final int LINES_PER_ITEM = 10;
 
     private final Board board;
-    private final PieceSelector selector;
+    private final Supplier<Block> source;
     private final ItemBlockFactory itemFactory;
     private final boolean itemMode;
     private Block next;
@@ -25,11 +25,25 @@ public final class BlockSpawner {
     private int pendingItems;
 
     public BlockSpawner(Board board, PieceSelector selector, ItemBlockFactory itemFactory, boolean itemMode) {
+        this(board, itemFactory, itemMode, adaptSelector(selector));
+    }
+
+    /** 테스트·외부 생성기가 전달한 아이템 정보도 보존한다. */
+    private BlockSpawner(Board board, ItemBlockFactory itemFactory, boolean itemMode, Supplier<Block> source) {
         this.board = Objects.requireNonNull(board, "board");
-        this.selector = Objects.requireNonNull(selector, "selector");
+        this.source = Objects.requireNonNull(source, "source");
         this.itemFactory = Objects.requireNonNull(itemFactory, "itemFactory");
         this.itemMode = itemMode;
         this.next = drawNext();
+    }
+
+    public static BlockSpawner fromBlocks(Board board, Supplier<Block> source, ItemBlockFactory factory, boolean itemMode) {
+        return new BlockSpawner(board, factory, itemMode, source);
+    }
+
+    private static Supplier<Block> adaptSelector(PieceSelector selector) {
+        Objects.requireNonNull(selector, "selector");
+        return () -> new Block(selector.next());
     }
 
     /** 다음에 생성될 블록. 미리보기 표시에만 사용하고 이동·회전하지 않는다. */
@@ -84,12 +98,12 @@ public final class BlockSpawner {
     }
 
     private Block drawNext() {
-        TetrominoType type = selector.next();
-        if (pendingItems > 0) {
+        Block block = Objects.requireNonNull(source.get(), "source result").spawnCopy(0, 0);
+        if (pendingItems > 0 && !block.hasItem()) {
             pendingItems--;
-            return itemFactory.create(true, type, 0, 0);
+            return itemFactory.create(true, block.getType(), 0, 0);
         }
-        return new Block(type);
+        return block;
     }
 
     /** 회전 공간을 가로 가운데에 두고, 블록의 맨 윗줄이 화면에 보이는 첫 줄(버퍼 바로 아래)에 오게 놓는다. */

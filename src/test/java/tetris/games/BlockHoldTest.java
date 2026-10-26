@@ -11,8 +11,38 @@ import static org.junit.jupiter.api.Assertions.*;
 import static tetris.block.TetrominoType.*;
 
 class BlockHoldTest {
+    @Test
+    void weightCannotBeHeldBeforeOrAfterCrushingAndPreservesExistingHold() {
+        Block weight = new ItemBlockFactory(new Random(42)).create(true, T, ItemType.WEIGHT, 0, 0);
+        var queue = new ArrayDeque<>(List.of(new Block(T), new Block(O), weight, new Block(I), new Block(S)));
+        Board board = new Board();
+        Game game = new Game(board, queue::removeFirst, GameSettings.DEFAULT, new DeletionScorePolicy());
+        game.start();
+        assertTrue(game.hold());
+        game.hardDrop();
+        assertEquals(ItemType.WEIGHT, game.getCurrentBlock().getItemType());
+        assertFalse(game.canHold());
+        assertFalse(game.hold());
+        board.lock(List.of(new tetris.board.Position(5, 4)), tetris.board.Cell.J);
+        for (int i = 0; i < 6; i++) assertTrue(game.softDrop());
+        assertTrue(board.isEmpty(5, 4));
+        long score = game.getScore();
+        int y = game.getCurrentBlock().getY();
+        String snapshot = board.toString();
+        assertFalse(game.hold());
+        assertEquals(y, game.getCurrentBlock().getY());
+        assertEquals(score, game.getScore());
+        assertEquals(snapshot, board.toString());
+        assertEquals(T, game.getHeldType());
+        assertEquals(I, game.getNextType());
+        game.hardDrop();
+        assertTrue(game.canHold());
+        assertTrue(game.hold());
+        assertEquals(T, game.getCurrentType());
+    }
+
     @ParameterizedTest
-    @EnumSource(ItemType.class)
+    @EnumSource(value = ItemType.class, names = "WEIGHT", mode = EnumSource.Mode.EXCLUDE)
     void holdSwapPreservesItemAndResetsOnlyPositionAndOrientation(ItemType item) {
         Block original = new ItemBlockFactory(new Random(42)).create(true, T, item, 8, 12);
         var expectedItemCells = original.spawnCopy(0, 0).getItemCells();

@@ -60,4 +60,25 @@ class BlockPreviewTest {
         if (node instanceof Parent p) return p.getChildrenUnmodifiable().stream().flatMap(n -> texts(n).stream()).toList();
         return List.of();
     }
+
+    @Test void boardRendersGrayGhostItemSymbolWeightAndFlash() {
+        var cells = new Board().getVisibleCells();
+        cells[19][1] = tetris.board.Cell.WEIGHT;
+        cells[19][2] = tetris.board.Cell.T;
+        char[][] symbols = new char[20][10];
+        for (char[] row : symbols) Arrays.fill(row, '.');
+        symbols[19][1] = 'O';
+        symbols[19][2] = 'M';
+        var view = new ColoredBoardView();
+        view.render(cells, symbols, List.of(new tetris.board.Position(19, 0)), Set.of(), false, true);
+        var row = (javafx.scene.layout.HBox) view.getChildren().get(20);
+        assertEquals(javafx.scene.paint.Color.GRAY, ((Text)row.getChildren().get(1)).getFill());
+        assertEquals("O ", ((Text)row.getChildren().get(1)).getText());
+        assertEquals(javafx.scene.paint.Color.WHITESMOKE, ((Text)row.getChildren().get(2)).getFill());
+        assertEquals("M ", ((Text)row.getChildren().get(3)).getText());
+        view.render(cells, symbols, List.of(), Set.of(19), false, true);
+        assertEquals(javafx.scene.paint.Color.TRANSPARENT, ((Text)row.getChildren().get(3)).getFill());
+        view.render(cells, symbols, List.of(), Set.of(19), true, true);
+        assertEquals(javafx.scene.paint.Color.WHITE, ((Text)row.getChildren().get(3)).getFill());
+    }
 }
