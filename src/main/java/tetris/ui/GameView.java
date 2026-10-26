@@ -146,8 +146,8 @@ public class GameView extends StackPane {
         if (game.getState() == GameState.RUNNING && getScene() != null) gravity.play();
         else if (game.getState() == GameState.PAUSED) gravity.pause();
         else gravity.stop();
-        nextPreview.showPiece(game.getNextType(), controls.colorBlindMode());
-        holdPreview.showPiece(game.getHeldType(), controls.colorBlindMode());
+        nextPreview.showBlock(game.getNextBlock(), controls.colorBlindMode());
+        holdPreview.showBlock(game.getHeldBlock(), controls.colorBlindMode());
         movementHint.setText(key(GameAction.LEFT) + "/" + key(GameAction.RIGHT) + ": 이동   "
                 + key(GameAction.ROTATE) + ": 회전   " + key(GameAction.SOFT_DROP) + ": 하강");
         actionHint.setText(key(GameAction.HARD_DROP) + ": 즉시 낙하   " + key(GameAction.HOLD)

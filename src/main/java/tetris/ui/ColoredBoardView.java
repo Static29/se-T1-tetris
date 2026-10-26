@@ -4,6 +4,7 @@ import javafx.scene.layout.VBox;
 import javafx.scene.layout.HBox;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
+import javafx.scene.text.FontWeight;
 import javafx.scene.text.Text;
 import tetris.block.TetrominoType;
 import tetris.board.Cell;
@@ -35,7 +36,7 @@ public final class ColoredBoardView extends VBox {
     }
     private Text label(String value) {
         Text text = new Text(value);
-        text.setFont(Font.font("Monospaced", 19));
+        text.setFont(Font.font("Monospaced", FontWeight.BOLD, 19));
         text.setFill(Color.WHITESMOKE);
         return text;
     }

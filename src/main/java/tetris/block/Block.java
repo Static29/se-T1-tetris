@@ -77,6 +77,19 @@ public class Block {
     public int getX() { return x; }
     public int getY() { return y; }
 
+    /** 위치·회전·아이템 정보를 보존하는 독립 복사본. */
+    public Block copy() {
+        Block copy = new Block(type, x, y, cells, itemType, itemCellIndex);
+        copy.rotationState = rotationState;
+        return copy;
+    }
+
+    /** 아이템 종류와 부착 칸은 유지하고 생성 위치·방향으로 초기화한 복사본. */
+    public Block spawnCopy(int x, int y) {
+        if (itemType == ItemType.WEIGHT) return weight(x, y);
+        return new Block(type, x, y, spawnCells(type), itemType, itemCellIndex);
+    }
+
     /** 0=생성 방향, 1=R, 2=180도, 3=L. O와 무게추는 0을 유지한다. */
     public int getRotationState() { return rotationState; }
 

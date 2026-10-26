@@ -3,6 +3,18 @@
 `Game`이 현재 `Block`과 `Board`를 관리한다. UI는 Game의 조작 메서드를 호출하고
 `getVisibleCells()` 복사본을 표시한다. 낙하 중 블록은 화면 복사본에만 합성한다.
 
+현재·Next·Hold는 모두 `Block` 객체를 저장한다. `getCurrentBlock()`,
+`getNextBlock()`, `getHeldBlock()`은 방어적 복사본을 반환한다.
+Hold·재생성 시 `spawnCopy(x, y)`로 위치·방향만 초기화하고 아이템 종류와 부착 칸을 보존한다.
+`Game(Board, Supplier<Block>, GameSettings, ScorePolicy)`로 아이템 생성기를 연결할 수 있다.
+기존 `Supplier<TetrominoType>` 생성자는 호환용이며 일반 Block으로 변환한다.
+기존 종류 getter는 무게추일 때 null이므로 빈 Hold 판정에는 `getHeldBlock()`을 사용한다.
+
+Next/Hold는 `PiecePreviewView.showBlock()`으로 실제 모양과 L/F/B/M 표시를 읽는다.
+보드·블록·미리보기 테두리 문자는 굵은 고정폭 폰트를 사용한다.
+아이템의 자동 등장 조건·효과는 아직 연결하지 않았으며, 보드 Cell에는 아이템 메타데이터를
+저장하지 않는다. 무게추는 효과 연결 전까지 O 색상의 일반 점유 칸으로 표시·고정한다.
+
 - 좌표 변환은 `Position.fromXY()`를 사용한다. 보드의 상단 2행은 숨겨진 생성 영역이다.
 - 생성 원점은 y=0, x는 회전 프레임을 기준으로 가운데 배치한다.
 - 회전은 `BlockRotation.tryRotate()`가 SRS 후보를 순서대로 검사한다.
