@@ -4,13 +4,19 @@ import tetris.games.Difficulty;
 
 public final class DeletionScorePolicy implements ScorePolicy {
     @Override
+    public long lineItemRemovedCells(int count, Difficulty difficulty, double speedMultiplier) {
+        if (count < 0) throw new IllegalArgumentException("삭제 칸 수는 음수일 수 없습니다.");
+        return adjusted(count * 100L, difficulty, speedMultiplier);
+    }
+
+    @Override
     public long removedCells(int count, Difficulty difficulty) {
         return removedCells(count, difficulty, 1);
     }
     @Override
     public long removedCells(int count, Difficulty difficulty, double speedMultiplier) {
         if (count < 0) throw new IllegalArgumentException("삭제 칸 수는 음수일 수 없습니다.");
-        return adjusted(count * 10L, difficulty, speedMultiplier);
+        return adjusted(count * 100L, difficulty, speedMultiplier);
     }
 
     @Override

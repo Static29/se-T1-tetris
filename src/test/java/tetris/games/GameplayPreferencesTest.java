@@ -23,7 +23,7 @@ class GameplayPreferencesTest {
         assertEquals(112, policy.descendedCells(1, Difficulty.HARD, 2));
         assertEquals(108, policy.descendedCells(1, Difficulty.EASY, 2));
         assertEquals(2200, policy.clearedRows(1, Difficulty.HARD, 1.10));
-        assertEquals(88, policy.removedCells(4, Difficulty.HARD, 1.10));
+        assertEquals(880, policy.removedCells(4, Difficulty.HARD, 1.10));
         assertThrows(IllegalArgumentException.class, () -> policy.descendedCells(1, Difficulty.NORMAL, Double.NaN));
     }
 

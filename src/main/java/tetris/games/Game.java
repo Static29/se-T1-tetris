@@ -354,12 +354,16 @@ public class Game {
             state = GameState.GAME_OVER;
             return;
         }
-        long gained = scorePolicy.clearedRows(result.fullRowsCleared(), getDifficulty(), speed)
-                + scorePolicy.removedCells(result.itemCellsRemoved(), getDifficulty(), speed);
+        long itemScore = currentBlock.getItemType() == ItemType.LINE_CLEAR
+                ? scorePolicy.lineItemRemovedCells(result.itemCellsRemoved(), getDifficulty(), speed)
+                : scorePolicy.removedCells(result.itemCellsRemoved(), getDifficulty(), speed);
+        long gained = scorePolicy.clearedRows(result.fullRowsCleared(), getDifficulty(), speed) + itemScore;
         score += result.multiplierApplied() ? gained * 2 : gained;
         clearedLines += result.totalRowsCleared();
-        spawner.onLinesCleared(result.totalRowsCleared());
         takeNext();
+        // 기존 Next는 그대로 Current로 넘긴 뒤 새 Next에 아이템을 반영한다.
+        spawner.onLinesCleared(result.totalRowsCleared());
+        nextBlock = spawner.peekNext().copy();
         holdUsed = false;
         spawnCurrent();
     }
