@@ -215,7 +215,8 @@ public class Game {
         return weightMover == null ? fallSpeed.getIntervalMillis(clearedLines) : fallSpeed.getWeightIntervalMillis(clearedLines);
     }
     public double getSpeedMultiplier() {
-        return (double) FallSpeed.BASE_INTERVAL_MILLIS / getFallIntervalMillis();
+        double multiplier = fallSpeed.getSpeedMultiplier(clearedLines);
+        return weightMover == null ? multiplier : multiplier * FallSpeed.WEIGHT_SPEED_PERCENT / 100.0;
     }
 
     /** 아이템 담당이 실제 삭제한 고유 칸 수를 한 번 전달한다. 줄 삭제 칸은 제외한다. */
