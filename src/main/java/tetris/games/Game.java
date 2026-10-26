@@ -215,7 +215,8 @@ public class Game {
         return weightMover == null ? fallSpeed.getIntervalMillis(clearedLines) : fallSpeed.getWeightIntervalMillis(clearedLines);
     }
     public double getSpeedMultiplier() {
-        return (double) FallSpeed.BASE_INTERVAL_MILLIS / getFallIntervalMillis();
+        double multiplier = fallSpeed.getSpeedMultiplier(clearedLines);
+        return weightMover == null ? multiplier : multiplier * FallSpeed.WEIGHT_SPEED_PERCENT / 100.0;
     }
 
     /** 아이템 담당이 실제 삭제한 고유 칸 수를 한 번 전달한다. 줄 삭제 칸은 제외한다. */
@@ -354,12 +355,16 @@ public class Game {
             state = GameState.GAME_OVER;
             return;
         }
-        long gained = scorePolicy.clearedRows(result.fullRowsCleared(), getDifficulty(), speed)
-                + scorePolicy.removedCells(result.itemCellsRemoved(), getDifficulty(), speed);
+        long itemScore = currentBlock.getItemType() == ItemType.LINE_CLEAR
+                ? scorePolicy.lineItemRemovedCells(result.itemCellsRemoved(), getDifficulty(), speed)
+                : scorePolicy.removedCells(result.itemCellsRemoved(), getDifficulty(), speed);
+        long gained = scorePolicy.clearedRows(result.fullRowsCleared(), getDifficulty(), speed) + itemScore;
         score += result.multiplierApplied() ? gained * 2 : gained;
         clearedLines += result.totalRowsCleared();
-        spawner.onLinesCleared(result.totalRowsCleared());
         takeNext();
+        // 기존 Next는 그대로 Current로 넘긴 뒤 새 Next에 아이템을 반영한다.
+        spawner.onLinesCleared(result.totalRowsCleared());
+        nextBlock = spawner.peekNext().copy();
         holdUsed = false;
         spawnCurrent();
     }

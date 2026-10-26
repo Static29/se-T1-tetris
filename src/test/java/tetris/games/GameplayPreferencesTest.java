@@ -14,6 +14,29 @@ class GameplayPreferencesTest {
     @TempDir Path directory;
 
     @Test
+    void exactSpeedFormulaDrivesDescentAndDeletionAcrossDifficultiesAndLevels() {
+        double[] increments = {0.08, 0.10, 0.12};
+        for (Difficulty difficulty : Difficulty.values()) {
+            Board board = new Board();
+            Game game = new Game(() -> I, board, new GameSettings(difficulty, false), new DeletionScorePolicy());
+            game.start();
+            for (int n = 0; n < 31; n++) {
+                double speed = 1 + (n / 10) * increments[difficulty.ordinal()];
+                double bonus = 1 + (difficulty.getScorePercent() - 100) / 100.0 + (speed - 1) * 10;
+                assertEquals(speed, game.getSpeedMultiplier(), 1e-12);
+                for (int col = 0; col < 10; col++)
+                    if (col < 3 || col > 6) board.lock(List.of(new Position(21, col)), Cell.J);
+                long before = game.getScore();
+                int distance = game.hardDrop();
+                long expected = distance * (long)Math.floor(10 * bonus + 1e-8)
+                        + (long)Math.floor(1000 * bonus + 1e-8);
+                assertEquals(expected, game.getScore() - before);
+                game.advanceTime(Game.LINE_CLEAR_MILLIS);
+            }
+        }
+    }
+
+    @Test
     void speedBonusIsTenPercentForEachOnePercentAndAddsDifficultyBonus() {
         var policy = new DeletionScorePolicy();
         assertEquals(10, policy.descendedCells(1, Difficulty.NORMAL, 1));
@@ -23,7 +46,7 @@ class GameplayPreferencesTest {
         assertEquals(112, policy.descendedCells(1, Difficulty.HARD, 2));
         assertEquals(108, policy.descendedCells(1, Difficulty.EASY, 2));
         assertEquals(2200, policy.clearedRows(1, Difficulty.HARD, 1.10));
-        assertEquals(88, policy.removedCells(4, Difficulty.HARD, 1.10));
+        assertEquals(880, policy.removedCells(4, Difficulty.HARD, 1.10));
         assertThrows(IllegalArgumentException.class, () -> policy.descendedCells(1, Difficulty.NORMAL, Double.NaN));
     }
 

@@ -11,6 +11,34 @@ import static org.junit.jupiter.api.Assertions.*;
 import static tetris.block.TetrominoType.*;
 
 class ItemGameplayIntegrationTest {
+    @Test void crossingTenWithTwoRowsShowsItemInNextAndCarriesRemainder() {
+        Board board = new Board();
+        Game game = new Game(board, () -> new Block(I),
+                new GameSettings(Difficulty.NORMAL, false, GameMode.ITEM), new DeletionScorePolicy(), new Random(42));
+        game.start();
+        for (int i = 0; i < 9; i++) {
+            fillGap(board);
+            game.hardDrop();
+            game.advanceTime(Game.LINE_CLEAR_MILLIS);
+        }
+        assertFalse(game.getNextBlock().hasItem());
+        assertEquals(1, game.getLinesUntilItem());
+        for (int row = 20; row < 22; row++) for (int col = 0; col < 10; col++)
+            if (col != 5) board.lock(List.of(new Position(row, col)), Cell.J);
+        game.rotateClockwise();
+        game.hardDrop();
+        assertEquals(11, game.getClearedLines());
+        assertEquals(9, game.getLinesUntilItem());
+        assertFalse(game.getCurrentBlock().hasItem());
+        assertTrue(game.getNextBlock().hasItem());
+        game.advanceTime(Game.LINE_CLEAR_MILLIS);
+        var preview = game.getNextBlock();
+        assertTrue(game.hold());
+        assertEquals(preview.getItemType(), game.getCurrentBlock().getItemType());
+        assertFalse(game.getNextBlock().hasItem());
+        assertEquals(9, game.getLinesUntilItem());
+    }
+
     private void fillGap(Board board) {
         for (int col = 0; col < 10; col++)
             if (col < 3 || col > 6) board.lock(List.of(new Position(21, col)), Cell.J);
@@ -86,7 +114,13 @@ class ItemGameplayIntegrationTest {
             game.advanceTime(Game.LINE_CLEAR_MILLIS);
         }
         assertEquals(10, game.getClearedLines());
-        assertEquals(mode == GameMode.ITEM, game.getCurrentBlock().hasItem());
+        assertFalse(game.getCurrentBlock().hasItem());
+        assertEquals(mode == GameMode.ITEM, game.getNextBlock().hasItem());
+        var preview = game.getNextBlock();
+        game.hardDrop();
+        assertEquals(preview.getType(), game.getCurrentBlock().getType());
+        assertEquals(preview.getItemType(), game.getCurrentBlock().getItemType());
+        assertTrue(Arrays.deepEquals(preview.getCells(), game.getCurrentBlock().getCells()));
     }
 
     @ParameterizedTest @EnumSource(ItemType.class)
@@ -111,7 +145,9 @@ class ItemGameplayIntegrationTest {
         var policy = new DeletionScorePolicy();
         double speed = game.getSpeedMultiplier();
         long deletion = policy.clearedRows(result.fullRowsCleared(), Difficulty.NORMAL, speed)
-                + policy.removedCells(result.itemCellsRemoved(), Difficulty.NORMAL, speed);
+                + (item == ItemType.LINE_CLEAR
+                    ? policy.lineItemRemovedCells(result.itemCellsRemoved(), Difficulty.NORMAL, speed)
+                    : policy.removedCells(result.itemCellsRemoved(), Difficulty.NORMAL, speed));
         assertEquals(distance, game.hardDrop());
         assertEquals(expectedBoard.toString(), board.toString());
         assertEquals(result.totalRowsCleared(), game.getClearedLines());
