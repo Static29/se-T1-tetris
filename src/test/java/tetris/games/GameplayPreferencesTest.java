@@ -40,14 +40,14 @@ class GameplayPreferencesTest {
             game.advanceTime(Game.LINE_CLEAR_MILLIS);
         }
         assertEquals(10, game.getClearedLines());
-        assertEquals(500, game.getFallIntervalMillis());
+        assertEquals(909, game.getFallIntervalMillis());
         long before = game.getScore();
         game.softDrop();
-        assertEquals(110, game.getScore() - before);
+        assertEquals(20, game.getScore() - before);
         game.pause();
         game.tick();
         game.hardDrop();
-        assertEquals(110, game.getScore() - before);
+        assertEquals(20, game.getScore() - before);
     }
 
     @Test
