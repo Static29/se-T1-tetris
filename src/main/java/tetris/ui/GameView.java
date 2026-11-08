@@ -23,7 +23,7 @@ public class GameView extends StackPane {
     private final PiecePreviewView holdPreview = new PiecePreviewView("HOLD");
     private final Text holdHint = createText("", 14);
     private PauseMenuView pauseMenu;
-    private final ColoredBoardView boardView = new ColoredBoardView();
+    private final ColoredBoardView boardView;
     private GameSettings controls;
     private final Text movementHint = createText("", 14);
     private final Text actionHint = createText("", 14);
@@ -41,6 +41,7 @@ public class GameView extends StackPane {
     public GameView(Game game, Runnable onMainMenu, Runnable onExit,
                     InitialsEntryView.SubmitAction submitScore, Runnable skipScore, Runnable onSettings) {
         this.game = game;
+        this.boardView = new ColoredBoardView(game.getVisibleRows(), game.getColumns());
         this.controls = game.getSettings();
         this.submitScore = submitScore;
         this.skipScore = skipScore;
@@ -146,8 +147,9 @@ public class GameView extends StackPane {
                 + "\n\n난이도: " + game.getDifficulty().getLabel()
                 + "\n\n점수: " + game.getScore() + "\n\n삭제 줄: " + game.getClearedLines()
                 + "\n\n속도: " + String.format(java.util.Locale.ROOT, "%.2fx", game.getSpeedMultiplier()));
-        boardView.render(game.getVisibleCells(), game.getVisibleSymbols(), game.getGhostCells(),
-                game.getFlashingVisibleRows(), game.isClearFlashOn(), controls.colorBlindMode());
+        var snapshot = game.getBoardSnapshot();
+        boardView.render(snapshot.cells(), snapshot.symbols(), snapshot.ghostCells(),
+                snapshot.flashingRows(), snapshot.flashOn(), controls.colorBlindMode());
         if (getScene() != null && (game.getState() == GameState.RUNNING
                 || game.getState() == GameState.GAME_OVER && game.isClearingLines())) {
             if (!clockRunning) { clockRunning = true; gravity.start(); }
@@ -158,8 +160,9 @@ public class GameView extends StackPane {
                 + key(GameAction.ROTATE) + ": 회전   " + key(GameAction.SOFT_DROP) + ": 하강");
         actionHint.setText(key(GameAction.HARD_DROP) + ": 즉시 낙하   " + key(GameAction.HOLD)
                 + ": Hold   " + key(GameAction.PAUSE) + ": 일시정지");
+        var currentBlock = game.getCurrentBlock();
         holdHint.setText(game.canHold() ? key(GameAction.HOLD) + ": 보관 / 교환" :
-                game.getCurrentBlock() != null && game.getCurrentBlock().getItemType() == tetris.block.ItemType.WEIGHT
+                currentBlock != null && currentBlock.getItemType() == tetris.block.ItemType.WEIGHT
                         ? "무게추는 Hold 불가" :
                 game.getState() == GameState.RUNNING
                         ? "고정 후 사용 가능" : "진행 중에만 사용");
