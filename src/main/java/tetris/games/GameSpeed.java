@@ -14,9 +14,8 @@ final class GameSpeed {
         return weight ? fallSpeed.getWeightIntervalMillis(lines) : fallSpeed.getIntervalMillis(lines);
     }
 
-    double multiplier(int lines, boolean weight) {
-        double normal = fallSpeed.getSpeedMultiplier(lines);
-        // Board에 정확한 무게추 배율 API가 없어 상수로 연결한다. 정수 ms 역산은 오차·상한 정책을 바꾼다.
-        return weight ? normal * FallSpeed.WEIGHT_SPEED_PERCENT / 100.0 : normal;
+    /** 표시·점수는 일반 속도 기준이다. 무게추의 특수 가속은 낙하 간격에만 적용한다. */
+    double multiplier(int lines) {
+        return fallSpeed.getSpeedMultiplier(lines);
     }
 }

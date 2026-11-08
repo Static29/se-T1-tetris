@@ -202,7 +202,7 @@ public class Game {
         return speed.interval(clearedLines, motion != null && motion.isWeight());
     }
     public double getSpeedMultiplier() {
-        return speed.multiplier(clearedLines, motion != null && motion.isWeight());
+        return speed.multiplier(clearedLines);
     }
 
     /** 아이템 담당이 실제 삭제한 고유 칸 수를 한 번 전달한다. 줄 삭제 칸은 제외한다. */

@@ -76,11 +76,35 @@ class GameModularityTest {
         for (int lines : new int[] {0, 10, 30, 10000}) {
             assertEquals(boardSpeed.getIntervalMillis(lines), speed.interval(lines, false));
             assertEquals(boardSpeed.getWeightIntervalMillis(lines), speed.interval(lines, true));
-            assertEquals(boardSpeed.getSpeedMultiplier(lines), speed.multiplier(lines, false));
-            assertEquals(boardSpeed.getSpeedMultiplier(lines) * 1.5, speed.multiplier(lines, true), 1e-10);
+            assertEquals(boardSpeed.getSpeedMultiplier(lines), speed.multiplier(lines));
         }
         assertEquals(50, speed.interval(10000, true));
-        assertTrue(speed.multiplier(10000, true) > 20);
+        assertTrue(speed.multiplier(10000) > 20);
+    }
+
+    @ParameterizedTest @EnumSource(Difficulty.class)
+    void weightFallsFasterButDisplaysAndScoresAtNormalSpeed(Difficulty difficulty) {
+        Block weight = new ItemBlockFactory(new Random(42))
+                .create(true, TetrominoType.T, ItemType.WEIGHT, 0, 0);
+        var settings = new GameSettings(difficulty, false, GameMode.ITEM);
+        Game weighted = new Game(new Board(), () -> weight, settings, new DeletionScorePolicy());
+        Game normal = new Game(new Board(), () -> new Block(TetrominoType.T),
+                settings, new DeletionScorePolicy());
+        weighted.start();
+        normal.start();
+        assertEquals(1.0, weighted.getSpeedMultiplier());
+        assertEquals(normal.getSpeedMultiplier(), weighted.getSpeedMultiplier());
+        int weightY = weighted.getCurrentBlock().getY();
+        int normalY = normal.getCurrentBlock().getY();
+        weighted.advanceTime(666);
+        normal.advanceTime(666);
+        assertEquals(weightY + 1, weighted.getCurrentBlock().getY());
+        assertEquals(normalY, normal.getCurrentBlock().getY());
+        weighted.advanceTime(334);
+        normal.advanceTime(334);
+        assertEquals(normalY + 1, normal.getCurrentBlock().getY());
+        assertEquals(difficulty.applyScore(10), weighted.getScore());
+        assertEquals(normal.getScore(), weighted.getScore());
     }
 
     @Test void snapshotOfReadyAndGameOverDoesNotPredictLanding() {
