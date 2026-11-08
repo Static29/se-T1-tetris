@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.ArrayDeque;
 import java.util.Deque;
-import java.util.stream.Collectors;
 import java.util.function.Supplier;
 import java.util.random.RandomGenerator;
 import tetris.block.TetrominoType;
@@ -16,11 +15,9 @@ import tetris.board.Board;
 import tetris.board.BlockRotation;
 import tetris.board.Cell;
 import tetris.board.Position;
-import tetris.board.FallSpeed;
 import tetris.board.BlockSpawner;
 import tetris.board.PieceSelector;
 import tetris.board.BlockLocker;
-import tetris.board.WeightMover;
 import tetris.board.LineClearEffect;
 import tetris.board.LockDelay;
 import tetris.score.ScorePolicy;
@@ -29,7 +26,8 @@ import tetris.score.DeletionScorePolicy;
 public class Game {
     private final BlockSpawner spawner;
     private final BlockLocker locker;
-    private WeightMover weightMover;
+    private PieceMotion motion;
+    private final BoardProjection projection;
     private final LockDelay lockDelay = new LockDelay();
     public static final long LINE_CLEAR_MILLIS = 360;
     private final Deque<LineClearEffect> clearEffects = new ArrayDeque<>();
@@ -38,12 +36,11 @@ public class Game {
     private long fallElapsed;
     private static final class PieceProgress {
         int paidDepth;
-        boolean weightTouched;
+        PieceProgress(int spawnDepth) { paidDepth = spawnDepth; }
     }
-    private PieceProgress progress = new PieceProgress();
+    private PieceProgress progress;
     private PieceProgress heldProgress;
     private GameState state = GameState.READY;
-    private Block nextBlock;
     private Block heldBlock;
     private boolean holdUsed;
     private final Board board;
@@ -52,7 +49,7 @@ public class Game {
     private final GameSettings settings;
     private final ScorePolicy scorePolicy;
     private long score;
-    private final FallSpeed fallSpeed;
+    private final GameSpeed speed;
 
     public Game() {
         this(GameSettings.DEFAULT);
@@ -85,16 +82,13 @@ public class Game {
     public Game(Board board, Supplier<Block> pieceSource, GameSettings settings,
                 ScorePolicy scorePolicy, RandomGenerator random) {
         this.board = Objects.requireNonNull(board);
+        this.projection = new BoardProjection(board);
         this.settings = Objects.requireNonNull(settings);
         this.scorePolicy = Objects.requireNonNull(scorePolicy);
         this.spawner = BlockSpawner.fromBlocks(board, Objects.requireNonNull(pieceSource),
                 new ItemBlockFactory(random), settings.mode() == GameMode.ITEM);
         this.locker = new BlockLocker(random);
-        this.fallSpeed = new FallSpeed(switch (settings.difficulty()) {
-            case EASY -> FallSpeed.EASY_INCREASE_PERCENT;
-            case NORMAL -> FallSpeed.NORMAL_INCREASE_PERCENT;
-            case HARD -> FallSpeed.HARD_INCREASE_PERCENT;
-        });
+        this.speed = new GameSpeed(settings.difficulty());
     }
 
     private static Supplier<Block> adaptTypes(Supplier<TetrominoType> source) {
@@ -104,12 +98,7 @@ public class Game {
 
     private static Supplier<TetrominoType> defaultPieceSource(GameSettings settings) {
         RandomGenerator random = RandomGenerator.getDefault();
-        int iWeight = switch (settings.difficulty()) {
-            case EASY -> PieceSelector.EASY_I_WEIGHT;
-            case NORMAL -> PieceSelector.NORMAL_I_WEIGHT;
-            case HARD -> PieceSelector.HARD_I_WEIGHT;
-        };
-        return PieceSelector.withIWeight(iWeight, random)::next;
+        return PieceSelector.withIWeight(settings.difficulty().getIWeight(), random)::next;
     }
 
     public TetrominoType getCurrentType() {
@@ -117,7 +106,7 @@ public class Game {
     }
 
     public TetrominoType getNextType() {
-        return nextBlock == null ? null : nextBlock.getType();
+        return state == GameState.READY ? null : spawner.peekNext().getType();
     }
 
     public TetrominoType getHeldType() {
@@ -125,7 +114,7 @@ public class Game {
     }
 
     public Block getCurrentBlock() { return currentBlock == null ? null : currentBlock.copy(); }
-    public Block getNextBlock() { return nextBlock == null ? null : nextBlock.copy(); }
+    public Block getNextBlock() { return state == GameState.READY ? null : spawner.peekNext().copy(); }
     public Block getHeldBlock() { return heldBlock == null ? null : heldBlock.copy(); }
 
     public boolean canHold() {
@@ -141,7 +130,7 @@ public class Game {
         if (state == GameState.READY) {
             takeNext();
             state = GameState.RUNNING;
-            spawnCurrent();
+            initializeCurrentPieceState();
         }
     }
 
@@ -150,19 +139,20 @@ public class Game {
         if (!canHold()) {
             return false;
         }
+        // Hold 보관·미리보기용 로컬 원점이며 실제 보드 생성 좌표는 Spawner가 결정한다.
         Block previous = currentBlock.spawnCopy(0, 0);
         PieceProgress previousProgress = progress;
-        if (weightMover != null) previousProgress.weightTouched = weightMover.isTouched();
         if (heldBlock == null) {
             takeNext();
         } else {
             currentBlock = heldBlock;
             progress = heldProgress;
+            spawner.resetToSpawn(currentBlock);
         }
         heldBlock = previous;
         heldProgress = previousProgress;
         holdUsed = true;
-        spawnCurrent();
+        initializeCurrentPieceState();
         return true;
     }
 
@@ -176,14 +166,12 @@ public class Game {
         }
         takeNext();
         holdUsed = false;
-        spawnCurrent();
+        initializeCurrentPieceState();
         return true;
     }
 
-    private void spawnCurrent() {
-        spawner.resetToSpawn(currentBlock);   // 생성 위치·회전 초기화는 board(BlockSpawner)가 담당
-        weightMover = currentBlock.getItemType() == ItemType.WEIGHT
-                ? new WeightMover(board, currentBlock, progress.weightTouched) : null;
+    private void initializeCurrentPieceState() {
+        motion = new PieceMotion(board, currentBlock);
         lockDelay.clear();
         fallElapsed = 0;
         if (board.isBlockOut(Position.fromXY(currentBlock.getBoardCells()))) {
@@ -193,8 +181,7 @@ public class Game {
 
     private void takeNext() {
         currentBlock = spawner.spawn();
-        nextBlock = spawner.peekNext().copy();
-        progress = new PieceProgress();
+        progress = new PieceProgress(currentBlock.getY());
     }
 
     private boolean canAct() { return state == GameState.RUNNING && !isClearingLines(); }
@@ -202,21 +189,20 @@ public class Game {
     public int getLinesUntilItem() { return spawner.getLinesUntilItem(); }
     public boolean isClearFlashOn() { return (clearElapsed / 60) % 2 == 0; }
     public Set<Integer> getFlashingVisibleRows() {
-        if (!isClearingLines()) return Set.of();
-        return clearEffects.peek().rows().stream().filter(board::isVisibleRow)
-                .map(row -> row - board.getBufferRows()).collect(Collectors.toUnmodifiableSet());
+        return projection.flashingRows(clearEffects.peek());
     }
 
     public int getClearedLines() { return clearedLines; }
+    public int getVisibleRows() { return board.getVisibleRows(); }
+    public int getColumns() { return board.getColumns(); }
     public long getScore() { return score; }
     public GameSettings getSettings() { return settings; }
     public Difficulty getDifficulty() { return settings.difficulty(); }
     public long getFallIntervalMillis() {
-        return weightMover == null ? fallSpeed.getIntervalMillis(clearedLines) : fallSpeed.getWeightIntervalMillis(clearedLines);
+        return speed.interval(clearedLines, motion != null && motion.isWeight());
     }
     public double getSpeedMultiplier() {
-        double multiplier = fallSpeed.getSpeedMultiplier(clearedLines);
-        return weightMover == null ? multiplier : multiplier * FallSpeed.WEIGHT_SPEED_PERCENT / 100.0;
+        return speed.multiplier(clearedLines, motion != null && motion.isWeight());
     }
 
     /** 아이템 담당이 실제 삭제한 고유 칸 수를 한 번 전달한다. 줄 삭제 칸은 제외한다. */
@@ -227,42 +213,30 @@ public class Game {
 
     /** 화면용 복사본에만 낙하 중 블록을 합성한다. 숨겨진 행은 제외한다. */
     public Cell[][] getVisibleCells() {
-        if (isClearingLines()) return clearEffects.peek().visibleCells();
-        Cell[][] cells = board.getVisibleCells();
-        if (currentBlock != null && state != GameState.GAME_OVER) {
-            for (Position p : Position.fromXY(currentBlock.getBoardCells())) {
-                if (board.isVisibleRow(p.row())) {
-                    cells[p.row() - board.getBufferRows()][p.col()] = currentCell();
-                }
-            }
-        }
-        return cells;
+        return projection.snapshot(visibleActiveBlock(), null, clearEffects.peek(), isClearFlashOn()).cells();
     }
 
     /** 표시 전용. 고정 M과 낙하 중 아이템의 기호를 반환한다. */
     public char[][] getVisibleSymbols() {
-        Cell[][] cells = getVisibleCells();
-        char[][] symbols = new char[cells.length][board.getColumns()];
-        for (int row = 0; row < cells.length; row++) for (int col = 0; col < board.getColumns(); col++)
-            symbols[row][col] = cells[row][col].isEmpty() ? '.'
-                    : !isClearingLines() && board.isMultiplier(row + board.getBufferRows(), col) ? 'M' : 'O';
-        if (!isClearingLines() && currentBlock != null && state != GameState.GAME_OVER) {
-            for (int[] cell : currentBlock.getCells()) {
-                int row = cell[1] + currentBlock.getY(), col = cell[0] + currentBlock.getX();
-                if (board.isVisibleRow(row)) symbols[row - board.getBufferRows()][col] = currentBlock.getCellSymbol(cell[0], cell[1]);
-            }
-        }
-        return symbols;
+        return projection.snapshot(visibleActiveBlock(), null, clearEffects.peek(), isClearFlashOn()).symbols();
     }
 
     /** 현재 블록의 착지 지점. 무게추는 보드 복사본에서만 경로를 계산한다. */
     public List<Position> getGhostCells() {
-        if (currentBlock == null || state == GameState.GAME_OVER || isClearingLines()) return List.of();
-        Block ghost = currentBlock.copy();
-        if (weightMover != null) new WeightMover(board.copy(), ghost).dropToFloor();
-        else while (board.canPlace(Position.fromXY(ghost.previewMove(0, 1)))) ghost.move(0, 1);
-        return Position.fromXY(ghost.getBoardCells()).stream().filter(p -> board.isVisibleRow(p.row()))
-                .map(p -> new Position(p.row() - board.getBufferRows(), p.col())).toList();
+        return projection.ghostCells(landingBlock());
+    }
+
+    /** UI는 프레임당 이 메서드 한 번으로 셀·문자·착지·깜빡임 데이터를 얻는다. */
+    public GameBoardSnapshot getBoardSnapshot() {
+        return projection.snapshot(visibleActiveBlock(), landingBlock(), clearEffects.peek(), isClearFlashOn());
+    }
+
+    private Block visibleActiveBlock() {
+        return state == GameState.GAME_OVER || isClearingLines() ? null : currentBlock;
+    }
+
+    private Block landingBlock() {
+        return visibleActiveBlock() == null ? null : motion.landing();
     }
 
     public boolean moveLeft() { return tryMove(-1, 0); }
@@ -270,12 +244,7 @@ public class Game {
 
     private boolean tryMove(int dx, int dy) {
         if (!canAct()) return false;
-        if (weightMover != null) {
-            if (!(dy > 0 ? weightMover.stepDown() : weightMover.tryMoveSideways(dx))) return false;
-        } else {
-            if (!board.canPlace(Position.fromXY(currentBlock.previewMove(dx, dy)))) return false;
-            currentBlock.move(dx, dy);
-        }
+        if (!(dy > 0 ? motion.stepDown() : motion.moveSideways(dx))) return false;
         if (dy > 0 && currentBlock.getY() > progress.paidDepth) {
             score += scorePolicy.descendedCells(1, getDifficulty(), getSpeedMultiplier());
             progress.paidDepth = currentBlock.getY();
@@ -300,13 +269,8 @@ public class Game {
 
     public void tick() { softDrop(); }
 
-    private boolean isGrounded() {
-        return weightMover != null ? weightMover.isOnFloor()
-                : !board.canPlace(Position.fromXY(currentBlock.previewMove(0, 1)));
-    }
-
     private void updateGrounded(boolean movedOrRotated) {
-        if (isGrounded()) {
+        if (motion.isGrounded()) {
             if (movedOrRotated) lockDelay.onMoveOrRotate(gameTime);
             lockDelay.onGrounded(gameTime);
         } else lockDelay.onAirborne();
@@ -355,22 +319,13 @@ public class Game {
             state = GameState.GAME_OVER;
             return;
         }
-        long itemScore = currentBlock.getItemType() == ItemType.LINE_CLEAR
-                ? scorePolicy.lineItemRemovedCells(result.itemCellsRemoved(), getDifficulty(), speed)
-                : scorePolicy.removedCells(result.itemCellsRemoved(), getDifficulty(), speed);
-        long gained = scorePolicy.clearedRows(result.fullRowsCleared(), getDifficulty(), speed) + itemScore;
-        score += result.multiplierApplied() ? gained * 2 : gained;
+        score += scorePolicy.lockedBlock(result, currentBlock.getItemType(), getDifficulty(), speed);
         clearedLines += result.totalRowsCleared();
         takeNext();
         // 기존 Next는 그대로 Current로 넘긴 뒤 새 Next에 아이템을 반영한다.
         spawner.onLinesCleared(result.totalRowsCleared());
-        nextBlock = spawner.peekNext().copy();
         holdUsed = false;
-        spawnCurrent();
-    }
-
-    private Cell currentCell() {
-        return BlockLocker.cellOf(currentBlock);
+        initializeCurrentPieceState();
     }
 
     public void pause() {

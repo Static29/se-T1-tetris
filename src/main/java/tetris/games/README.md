@@ -1,7 +1,50 @@
 # Classic / Item 모드 보드 연결
 
 `Game`이 현재 `Block`과 `Board`를 관리한다. UI는 Game의 조작 메서드를 호출하고
-`getVisibleCells()` 복사본을 표시한다. 낙하 중 블록은 화면 복사본에만 합성한다.
+`getBoardSnapshot()`으로 한 프레임의 셀·문자·착지·깜빡임 정보를 함께 받는다.
+낙하 중 블록은 화면 복사본에만 합성한다. 기존 개별 getter는 호환용으로 유지한다.
+
+## 2026-11-08 책임 분리
+
+`develope`의 PR #21(`96c4504`, board 변경 `cff070f`)을 `games`에 병합한 뒤
+games/score/ui와 대응 테스트만 수정했다. board/block의 구현·테스트는 직접 변경하지 않았다.
+
+| 모듈 | 책임 |
+|---|---|
+| Game | 게임 상태·현재/Hold·점수 누적·시간 진행·고정 결과 연결 |
+| Difficulty | 난이도와 보드의 I 가중치·속도 증가 상수 연결; Game의 두 switch 제거 |
+| GameSpeed | FallSpeed의 간격·정확한 점수용 배율 연결 |
+| PieceMotion | 일반/무게추 이동·접지 및 동일 이동 규칙을 이용한 착지 예측 |
+| BoardProjection | 버퍼 포함 보드 좌표와 가시 화면 좌표 변환·합성 |
+| GameBoardSnapshot | 프레임 단위 방어적 복사 데이터 |
+| ScorePolicy.lockedBlock | 개별 삭제·완성 줄 점수와 M 배율 계산; 하강 점수 제외 |
+| ui.BoardDimensions | 기본 크기 상수·사용자 지정 크기·셀/문자 스냅샷 검증 |
+
+### 사진의 점검 항목 처리
+
+1. 생성 위치: 새 블록은 `spawner.spawn()`의 위치를 그대로 사용한다. Hold 복귀에만
+   `resetToSpawn()`을 호출한다. Game은 타이머·이동기·생성 충돌 검사만 초기화한다.
+   Hold 보관의 `spawnCopy(0, 0)`은 미리보기용 로컬 좌표이며 보드 생성 위치를 덮어쓰지 않는다.
+   신규 블록 점수 이력은 실제 생성 y부터 시작하며, Hold 복귀는 기존 이력을 유지한다.
+2. 난이도: 수치를 새로 복제하지 않고 Difficulty에서 기존 PieceSelector/FallSpeed 상수를 참조한다.
+3. 무게추 배율: Game 밖 GameSpeed로 연결을 모았다. 현재 FallSpeed에는 정확한 무게추 배율
+   조회 API가 없어서 `WEIGHT_SPEED_PERCENT`로 연결하는 부분은 남아 있다.
+   이는 다른 담당 파일 수정 없이 완전히 제거할 수 없는 경계다. 향후 보드 PR에서
+   `getWeightSpeedMultiplier(lines)` 같은 API를 제공하면 이 한 곳만 교체한다.
+   간격 역산은 정수 버림 오차와 50ms 상한 이후 점수 증가 동작을 바꾸므로 사용하지 않는다.
+4. M 배율: `ItemType.MULTIPLIER.getScoreMultiplier()`를 ScorePolicy에서 사용한다.
+   L과 폭탄의 동일 칸당 정책은 기본 메서드로 공유하되, 사용자 정의 L 정책 재정의는 유지한다.
+5. ItemType 주석: block 담당 파일이므로 수정하지 않았다. B의 부족한 칸 처리와 M 범위의
+   오래된 주석은 담당자에게 수정 요청할 항목이다. 실제 B는 주변 채워진 칸 최대 4개와 자신,
+   M은 해당 고정의 삭제 점수 전체에 한 번 적용하는 기존 동작을 유지한다.
+6. 좌표·착지: BoardProjection/PieceMotion으로 분리했다. UI에서 셀·문자를 얻기 위해
+   보드 합성을 반복하지 않는다. 무게추의 착지 예측은 복사 보드에서만 수행한다.
+7. 크기: 기본값은 Board의 DEFAULT 상수를 참조하고, GameView는 실제 보드 크기를 전달한다.
+   ColoredBoardView의 검증용 문자열 생성은 제거했다. 기본 20×10 표시와 검사 계약은 유지한다.
+
+추가 정리: Next 중복 저장 필드 제거(Spawner의 큐를 조회), 무게추 Hold 금지로 도달할 수 없는
+접촉 상태 보존 코드 제거, Hold 안내를 위한 현재 블록 복사 반복 제거.
+자동 테스트: 생성/Hold/기존 점수 계약, 가변 버퍼·크기, 스냅샷 불변성, M 및 커스텀 점수 정책 검증.
 
 현재·Next·Hold는 모두 `Block` 객체를 저장한다. `getCurrentBlock()`,
 `getNextBlock()`, `getHeldBlock()`은 방어적 복사본을 반환한다.
