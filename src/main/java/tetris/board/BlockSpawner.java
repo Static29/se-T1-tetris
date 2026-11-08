@@ -7,28 +7,30 @@ import tetris.block.ItemBlockFactory;
 
 /**
  * 다음 블록(Next)을 미리 정해 두고, 요청하면 생성 위치에 놓아 내보낸다.
- * 종류는 PieceSelector가 확률로 정하고, 아이템 모드에서는 지운 줄이 LINES_PER_ITEM줄 쌓일 때마다
- * 화면에 보이는 Next를 즉시 아이템 블록으로 바꾼다. 보드의 칸은 바꾸지 않는다.
+ * 종류는 PieceSelector(또는 주입한 생성기)가 정하고, 아이템 모드에서는 ItemCounter가 LINES_PER_ITEM줄마다
+ * 아이템을 대기시키면 화면에 보이는 Next를 즉시 아이템 블록으로 바꾼다. 보드의 칸은 바꾸지 않는다.
  */
 public final class BlockSpawner {
     /** Req2: 아이템 모드에서 10줄을 지울 때마다 아이템이 등장한다. */
     public static final int LINES_PER_ITEM = 10;
+    /**
+     * 생성 위치의 회전 공간 원점 y(팀 결정 2026-11-07). 0은 숨겨진 버퍼 맨 위 줄이므로
+     * I는 row 1, 나머지는 row 0부터 차지하고 버퍼에서 내려와 화면에 나타난다.
+     */
+    public static final int SPAWN_Y = 0;
 
     private final Board board;
     private final Supplier<Block> source;
     private final ItemBlockFactory itemFactory;
     private final boolean itemMode;
+    /** 아이템 등장 주기(10줄 카운트·이월·대기 수). 아이템 모드가 아니면 줄이 더해지지 않는다. */
+    private final ItemCounter itemCounter = new ItemCounter();
     private Block next;
-    /** 다음 아이템까지 쌓인 줄 수(0 ~ LINES_PER_ITEM-1). 넘친 줄은 다음 아이템으로 이월한다. */
-    private int linesTowardItem;
-    /** 한 번에 많은 줄을 지워 아직 Next에 반영하지 못한 아이템 수. 이후 Next부터 차례로 반영한다. */
-    private int pendingItems;
 
     public BlockSpawner(Board board, PieceSelector selector, ItemBlockFactory itemFactory, boolean itemMode) {
         this(board, itemFactory, itemMode, adaptSelector(selector));
     }
 
-    /** 테스트·외부 생성기가 전달한 아이템 정보도 보존한다. */
     private BlockSpawner(Board board, ItemBlockFactory itemFactory, boolean itemMode, Supplier<Block> source) {
         this.board = Objects.requireNonNull(board, "board");
         this.source = Objects.requireNonNull(source, "source");
@@ -37,6 +39,7 @@ public final class BlockSpawner {
         this.next = drawNext();
     }
 
+    /** 종류 대신 완성된 Block을 주는 생성기를 쓴다. 생성기가 붙인 아이템 정보도 보존한다(Game·테스트용). */
     public static BlockSpawner fromBlocks(Board board, Supplier<Block> source, ItemBlockFactory factory, boolean itemMode) {
         return new BlockSpawner(board, factory, itemMode, source);
     }
@@ -51,10 +54,11 @@ public final class BlockSpawner {
 
     public boolean isItemMode() { return itemMode; }
 
-    /** 다음 아이템까지 남은 줄 수. 아이템 모드가 아니어도 계산은 한다. */
-    public int getLinesUntilItem() { return LINES_PER_ITEM - linesTowardItem; }
+    /** 다음 아이템까지 남은 줄 수. 아이템 모드가 아니면 줄이 쌓이지 않아 항상 LINES_PER_ITEM이다. */
+    public int getLinesUntilItem() { return itemCounter.getLinesUntilItem(); }
 
-    public int getPendingItemCount() { return pendingItems; }
+    /** 한 번에 많은 줄을 지워 아직 Next에 반영하지 못한 아이템 수. 이후 Next부터 차례로 반영한다. */
+    public int getPendingItemCount() { return itemCounter.getPendingItemCount(); }
 
     /**
      * Next 블록을 생성 위치에 놓아 반환하고, 새 Next를 정한다.
@@ -88,32 +92,28 @@ public final class BlockSpawner {
         if (!itemMode || lineCount == 0) {
             return;
         }
-        linesTowardItem += lineCount;
-        pendingItems += linesTowardItem / LINES_PER_ITEM;
-        linesTowardItem %= LINES_PER_ITEM;
-        if (pendingItems > 0 && !next.hasItem()) {
-            next = itemFactory.create(true, next.getType(), 0, 0);
-            pendingItems--;
-        }
+        itemCounter.addClearedLines(lineCount);
+        next = applyPendingItem(next);
     }
 
     private Block drawNext() {
-        Block block = Objects.requireNonNull(source.get(), "source result").spawnCopy(0, 0);
-        if (pendingItems > 0 && !block.hasItem()) {
-            pendingItems--;
-            return itemFactory.create(true, block.getType(), 0, 0);
-        }
-        return block;
+        return applyPendingItem(Objects.requireNonNull(source.get(), "source result").spawnCopy(0, 0));
     }
 
-    /** 회전 공간을 가로 가운데에 두고, 블록의 맨 윗줄이 화면에 보이는 첫 줄(버퍼 바로 아래)에 오게 놓는다. */
-    private void placeAtSpawn(Block block) {
-        int topLocalRow = Integer.MAX_VALUE;
-        for (int[] cell : block.getCells()) {
-            topLocalRow = Math.min(topLocalRow, cell[1]);
+    /**
+     * 대기 중인 아이템이 있고 block이 아직 아이템이 아니면, 같은 종류의 아이템 블록으로 바꾸고 대기 수를 하나 줄인다.
+     * 지금 보이는 Next를 바꿀 때(onLinesCleared)와 새 Next를 뽑을 때(drawNext)가 같은 규칙을 쓰게 한다.
+     */
+    private Block applyPendingItem(Block block) {
+        if (block.hasItem() || !itemCounter.takePendingItem()) {
+            return block;
         }
+        return itemFactory.create(true, block.getType(), 0, 0);
+    }
+
+    /** 회전 공간의 원점을 가로 가운데, 세로 SPAWN_Y(버퍼 맨 위)에 놓는다. */
+    private void placeAtSpawn(Block block) {
         int spawnX = (board.getColumns() - block.getFrameSize()) / 2;
-        int spawnY = board.getBufferRows() - topLocalRow;
-        block.move(spawnX - block.getX(), spawnY - block.getY());
+        block.move(spawnX - block.getX(), SPAWN_Y - block.getY());
     }
 }
