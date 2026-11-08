@@ -1,6 +1,5 @@
 package tetris.board;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import org.junit.jupiter.api.Test;
@@ -9,6 +8,7 @@ import tetris.block.ItemBlockFactory;
 import tetris.block.ItemType;
 import tetris.block.TetrominoType;
 import static org.junit.jupiter.api.Assertions.*;
+import static tetris.board.BoardFixtures.*;
 
 /**
  * 무게추 모양(로컬): .OO. / OOOO. 원점 (x, y)에 두면 위 두 칸은 (y, x+1~x+2), 아래 네 칸은 (y+1, x~x+3).
@@ -17,14 +17,6 @@ import static org.junit.jupiter.api.Assertions.*;
 class WeightMoverTest {
     private static Block weight(int x, int y) {
         return new ItemBlockFactory().create(true, null, ItemType.WEIGHT, x, y);
-    }
-
-    private static void fill(Board board, int row, int fromCol, int toCol, Cell cell) {
-        List<Position> line = new ArrayList<>();
-        for (int col = fromCol; col <= toCol; col++) {
-            line.add(new Position(row, col));
-        }
-        board.lock(line, cell);
     }
 
     @Test

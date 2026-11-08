@@ -5,18 +5,10 @@ import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
+import static tetris.board.BoardFixtures.*;
 
 /** 기본 보드는 0~1번 줄이 버퍼, 2~21번 줄이 보이는 영역, 0~9번 칸이다. */
 class BoardTest {
-    /** (row, col) 쌍을 순서대로 받아 좌표 목록을 만든다. 예: positions(0, 0, 0, 1) */
-    private static List<Position> positions(int... rowCols) {
-        List<Position> result = new ArrayList<>();
-        for (int i = 0; i < rowCols.length; i += 2) {
-            result.add(new Position(rowCols[i], rowCols[i + 1]));
-        }
-        return result;
-    }
-
     /** row 줄을 emptyCol 칸만 남기고 채운다. emptyCol이 -1이면 줄 전체를 채운다. */
     private static void fillRow(Board board, int row, Cell cell, int emptyCol) {
         List<Position> line = new ArrayList<>();

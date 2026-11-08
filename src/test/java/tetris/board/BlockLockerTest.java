@@ -1,7 +1,5 @@
 package tetris.board;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Random;
 import java.util.random.RandomGenerator;
 import org.junit.jupiter.api.Test;
@@ -10,6 +8,7 @@ import tetris.block.ItemBlockFactory;
 import tetris.block.ItemType;
 import tetris.block.TetrominoType;
 import static org.junit.jupiter.api.Assertions.*;
+import static tetris.board.BoardFixtures.*;
 
 /**
  * 가로 I 블록은 회전 공간 둘째 줄(로컬 y = 1)에 있다. 원점 (x, y)에 두면 row = y + 1, col = x ~ x+3.
@@ -36,23 +35,6 @@ class BlockLockerTest {
             return new Block(TetrominoType.I, x, y);
         }
         return new ItemBlockFactory(fixed(itemIndex)).create(true, TetrominoType.I, item, x, y);
-    }
-
-    private static List<Position> positions(int... rowCols) {
-        List<Position> result = new ArrayList<>();
-        for (int i = 0; i < rowCols.length; i += 2) {
-            result.add(new Position(rowCols[i], rowCols[i + 1]));
-        }
-        return result;
-    }
-
-    /** row 줄에서 fromCol ~ toCol 칸을 cell로 채운다. */
-    private static void fill(Board board, int row, int fromCol, int toCol, Cell cell) {
-        List<Position> line = new ArrayList<>();
-        for (int col = fromCol; col <= toCol; col++) {
-            line.add(new Position(row, col));
-        }
-        board.lock(line, cell);
     }
 
     private static int countFilled(Board board) {

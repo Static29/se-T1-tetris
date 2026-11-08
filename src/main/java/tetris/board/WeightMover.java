@@ -55,8 +55,8 @@ public final class WeightMover {
 
     /** 바닥에 닿아 더 내려갈 수 없으면 true. 고정 블록은 지우고 지나가므로 바닥만 기준이다. */
     public boolean isOnFloor() {
-        for (Position position : Position.fromXY(weight.previewMove(0, 1))) {
-            if (position.row() >= board.getTotalRows()) {
+        for (Position below : cellsBelow()) {
+            if (below.row() >= board.getTotalRows()) {
                 return true;
             }
         }
@@ -70,9 +70,9 @@ public final class WeightMover {
             return false;
         }
         List<Position> filled = new ArrayList<>();
-        for (Position position : Position.fromXY(weight.previewMove(0, 1))) {
-            if (!board.isEmpty(position)) {
-                filled.add(position);
+        for (Position below : cellsBelow()) {
+            if (!board.isEmpty(below)) {
+                filled.add(below);
             }
         }
         if (!filled.isEmpty()) {
@@ -92,16 +92,21 @@ public final class WeightMover {
         return distance;
     }
 
-    /** 바로 아래가 바닥이거나 고정 칸이면 닿은 것으로 기록한다. */
+    /** 바로 아래가 바닥이거나 고정 칸이면 닿은 것으로 기록한다. isEmpty는 보드 밖(바닥)을 false로 보므로 한 번에 판정된다. */
     private void updateTouched() {
         if (touched) {
             return;
         }
-        for (Position below : Position.fromXY(weight.previewMove(0, 1))) {
-            if (below.row() >= board.getTotalRows() || !board.isEmpty(below)) {
+        for (Position below : cellsBelow()) {
+            if (!board.isEmpty(below)) {
                 touched = true;
                 return;
             }
         }
+    }
+
+    /** 무게추를 한 칸 내렸을 때 차지할 칸. 바닥 판정·접촉 판정·관통 삭제가 같은 좌표를 쓴다. */
+    private List<Position> cellsBelow() {
+        return Position.fromXY(weight.previewMove(0, 1));
     }
 }

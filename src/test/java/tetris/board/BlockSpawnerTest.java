@@ -9,8 +9,9 @@ import tetris.block.Block;
 import tetris.block.ItemBlockFactory;
 import tetris.block.TetrominoType;
 import static org.junit.jupiter.api.Assertions.*;
+import static tetris.board.BoardFixtures.*;
 
-/** 기본 보드는 0~1번 줄이 버퍼, 2번 줄이 화면에 보이는 첫 줄이다. */
+/** 기본 보드는 0~1번 줄이 버퍼, 2번 줄이 화면에 보이는 첫 줄이다. 생성 원점은 y = 0(버퍼 맨 위)이다. */
 class BlockSpawnerTest {
     private static final long SEED = 20261024L;
 
@@ -23,30 +24,39 @@ class BlockSpawnerTest {
         return new BlockSpawner(new Board(), selector, new ItemBlockFactory(new Random(SEED)), itemMode);
     }
 
-    private static Set<Position> occupied(Block block) {
-        return Set.copyOf(Position.fromXY(block.getBoardCells()));
-    }
-
     @Test
-    void everyPieceSpawnsCenteredWithTopOnFirstVisibleRow() {
+    void everyPieceSpawnsCenteredWithOriginAtTopOfBuffer() {
         for (TetrominoType type : TetrominoType.values()) {
             Board board = new Board();
             Block block = new BlockSpawner(board, only(type), new ItemBlockFactory(new Random(SEED)), false).spawn();
-            int topRow = Integer.MAX_VALUE;
-            for (Position position : occupied(block)) {
-                topRow = Math.min(topRow, position.row());
-            }
-            assertEquals(board.getBufferRows(), topRow, type.name());
+            assertEquals(BlockSpawner.SPAWN_Y, block.getY(), type.name());
             assertEquals((board.getColumns() - block.getFrameSize()) / 2, block.getX(), type.name());
             assertFalse(board.isBlockOut(Position.fromXY(block.getBoardCells())), type.name());
         }
     }
 
     @Test
-    void iPieceSpawnsOnFirstVisibleRowColumnsThreeToSix() {
+    void iPieceSpawnsInBufferRowOneColumnsThreeToSix() {
         Block block = spawner(only(TetrominoType.I), false).spawn();
-        assertEquals(Set.of(new Position(2, 3), new Position(2, 4), new Position(2, 5), new Position(2, 6)),
+        assertEquals(Set.of(new Position(1, 3), new Position(1, 4), new Position(1, 5), new Position(1, 6)),
                 occupied(block));
+    }
+
+    @Test
+    void tPieceSpawnsInBothBufferRows() {
+        Block block = spawner(only(TetrominoType.T), false).spawn();
+        assertEquals(Set.of(new Position(0, 4), new Position(1, 3), new Position(1, 4), new Position(1, 5)),
+                occupied(block));
+    }
+
+    @Test
+    void resetToSpawnPlacesBlockStoredAtOriginLikeSpawn() {
+        // Game의 Hold는 블록을 spawnCopy(0, 0)으로 보관했다가 꺼낼 때 resetToSpawn으로 생성 위치에 놓는다.
+        BlockSpawner spawner = spawner(only(TetrominoType.L), false);
+        Block spawned = spawner.spawn();
+        Block held = spawned.spawnCopy(0, 0);
+        spawner.resetToSpawn(held);
+        assertEquals(occupied(spawned), occupied(held));
     }
 
     @Test
