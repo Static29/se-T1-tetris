@@ -181,7 +181,7 @@ public class Game {
     }
 
     private void spawnCurrent() {
-        currentBlock = currentBlock.spawnCopy((board.getColumns() - currentBlock.getFrameSize()) / 2, 0);
+        spawner.resetToSpawn(currentBlock);   // 생성 위치·회전 초기화는 board(BlockSpawner)가 담당
         weightMover = currentBlock.getItemType() == ItemType.WEIGHT
                 ? new WeightMover(board, currentBlock, progress.weightTouched) : null;
         lockDelay.clear();

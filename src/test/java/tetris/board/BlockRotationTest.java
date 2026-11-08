@@ -11,26 +11,13 @@ import tetris.block.ItemBlockFactory;
 import tetris.block.ItemType;
 import tetris.block.TetrominoType;
 import static org.junit.jupiter.api.Assertions.*;
+import static tetris.board.BoardFixtures.*;
 
 /**
  * Block의 x, y는 회전 공간(J·L·S·T·Z 3×3, I 4×4)의 왼쪽 위이며 row = y, col = x다.
  * 회전 상태: 0 = 생성, 1 = R, 2 = 180도, 3 = L. 시계 방향만 회전한다.
  */
 class BlockRotationTest {
-    /** (row, col) 쌍을 순서대로 받아 좌표 목록을 만든다. 예: positions(0, 0, 0, 1) */
-    private static List<Position> positions(int... rowCols) {
-        List<Position> result = new ArrayList<>();
-        for (int i = 0; i < rowCols.length; i += 2) {
-            result.add(new Position(rowCols[i], rowCols[i + 1]));
-        }
-        return result;
-    }
-
-    /** 칸 순서와 관계없이 비교하기 위해 블록의 점유 칸을 집합으로 만든다. */
-    private static Set<Position> occupied(Block block) {
-        return Set.copyOf(Position.fromXY(block.getBoardCells()));
-    }
-
     /** 회전 검사 없이 times번 회전한 블록. 시험할 회전 상태를 만들 때 쓴다. */
     private static Block rotatedBlock(TetrominoType type, int x, int y, int times) {
         Block block = new Block(type, x, y);
