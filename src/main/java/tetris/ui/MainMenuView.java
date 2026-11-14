@@ -1,9 +1,6 @@
 package tetris.ui;
 
 import java.util.List;
-import java.util.Objects;
-import tetris.games.Difficulty;
-import tetris.games.GameMode;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.input.KeyCode;
@@ -19,16 +16,22 @@ public class MainMenuView extends VBox {
     private final List<MenuItem> items;
     private final Text content = new Text();
     private int selectedIndex;
-    private Difficulty difficulty = Difficulty.NORMAL;
-    private GameMode mode = GameMode.CLASSIC;
 
     public MainMenuView(Runnable onStart, Runnable onSettings,
                         Runnable onLeaderboard, Runnable onExit) {
-        items = List.of(
-                new MenuItem("게임 시작", onStart),
+        this(onStart, null, onSettings, onLeaderboard, onExit);
+    }
+
+    public MainMenuView(Runnable onStart, Runnable onMultiplayer, Runnable onSettings,
+                        Runnable onLeaderboard, Runnable onExit) {
+        var entries = new java.util.ArrayList<MenuItem>();
+        entries.add(new MenuItem("일반 게임", onStart));
+        if (onMultiplayer != null) entries.add(new MenuItem("멀티플레이", onMultiplayer));
+        entries.addAll(List.of(
                 new MenuItem("설정", onSettings),
                 new MenuItem("리더보드", onLeaderboard),
-                new MenuItem("종료", onExit));
+                new MenuItem("종료", onExit)));
+        items = List.copyOf(entries);
         setAlignment(Pos.CENTER);
         setPadding(new Insets(24));
         setStyle("-fx-background-color: #101010;");
@@ -51,20 +54,8 @@ public class MainMenuView extends VBox {
         });
     }
 
-    public void setDifficulty(Difficulty difficulty) {
-        this.difficulty = Objects.requireNonNull(difficulty);
-        updateText();
-    }
-
-    public void setMode(GameMode mode) {
-        this.mode = Objects.requireNonNull(mode);
-        updateText();
-    }
-
     private void updateText() {
         StringBuilder text = new StringBuilder("===== T1 TETRIS =====\n\n");
-        text.append("현재 난이도: ").append(difficulty.getLabel()).append("\n\n");
-        text.append("게임 모드: ").append(mode.getLabel()).append("\n\n");
         for (int i = 0; i < items.size(); i++) {
             text.append(i == selectedIndex ? "> " : "  ")
                     .append(items.get(i).title()).append("\n\n");

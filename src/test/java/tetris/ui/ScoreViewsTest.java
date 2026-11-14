@@ -57,16 +57,13 @@ class ScoreViewsTest {
         AtomicReference<GameSettings> saved = new AtomicReference<>();
         AtomicInteger backs = new AtomicInteger();
         var view = new SettingsView(GameSettings.DEFAULT, "", saved::set, backs::incrementAndGet);
-        press(view, KeyCode.RIGHT); // hard
-        press(view, KeyCode.DOWN);
         press(view, KeyCode.ENTER); // color blind on
         assertNull(saved.get());
         press(view, KeyCode.DOWN);
         press(view, KeyCode.DOWN);
         press(view, KeyCode.DOWN);
-        press(view, KeyCode.DOWN);
         press(view, KeyCode.ENTER);
-        assertEquals(new GameSettings(Difficulty.HARD, true), saved.get());
+        assertEquals(new GameSettings(Difficulty.NORMAL, true), saved.get());
         assertEquals(1, backs.get());
         saved.set(null);
         var cancel = new SettingsView(GameSettings.DEFAULT, "", saved::set, backs::incrementAndGet);

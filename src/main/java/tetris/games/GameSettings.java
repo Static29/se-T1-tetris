@@ -4,7 +4,7 @@ import java.util.Objects;
 
 /** 새 게임에 전달하는 설정 스냅샷. 색상 적용은 렌더링 담당이 연결한다. */
 public record GameSettings(Difficulty difficulty, boolean colorBlindMode, GameMode mode,
-                           ScreenSize screenSize, KeyBindings keyBindings) {
+                           ScreenSize screenSize, KeyBindings keyBindings, KeyBindings playerTwoBindings) {
     public static final GameSettings DEFAULT = new GameSettings(Difficulty.NORMAL, false);
     public GameSettings(Difficulty difficulty, boolean colorBlindMode) {
         this(difficulty, colorBlindMode, GameMode.CLASSIC);
@@ -12,10 +12,16 @@ public record GameSettings(Difficulty difficulty, boolean colorBlindMode, GameMo
     public GameSettings(Difficulty difficulty, boolean colorBlindMode, GameMode mode) {
         this(difficulty, colorBlindMode, mode, ScreenSize.DEFAULT, KeyBindings.defaults());
     }
+    public GameSettings(Difficulty difficulty, boolean colorBlindMode, GameMode mode,
+                        ScreenSize screenSize, KeyBindings keyBindings) {
+        this(difficulty, colorBlindMode, mode, screenSize, keyBindings, KeyBindings.compatiblePlayerTwo(keyBindings));
+    }
     public GameSettings {
         Objects.requireNonNull(difficulty);
         Objects.requireNonNull(mode);
         Objects.requireNonNull(screenSize);
         Objects.requireNonNull(keyBindings);
+        Objects.requireNonNull(playerTwoBindings);
+        KeyBindings.validatePlayers(keyBindings, playerTwoBindings);
     }
 }

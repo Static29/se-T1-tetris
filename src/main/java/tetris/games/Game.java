@@ -6,6 +6,9 @@ import java.util.Set;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.function.Supplier;
+import java.util.function.Consumer;
+import tetris.board.GarbageQueue;
+import tetris.board.GarbageRow;
 import java.util.random.RandomGenerator;
 import tetris.block.TetrominoType;
 import tetris.block.Block;
@@ -50,6 +53,23 @@ public class Game {
     private final ScorePolicy scorePolicy;
     private long score;
     private final GameSpeed speed;
+    private final GarbageQueue incoming = new GarbageQueue();
+    private Consumer<List<GarbageRow>> attackListener = rows -> {};
+
+    /** 게임 스레드에서만 호출한다. 네트워크 이벤트도 같은 스레드로 전달한다. */
+    public void setAttackListener(Consumer<List<GarbageRow>> listener) {
+        attackListener = Objects.requireNonNull(listener);
+    }
+    public int receiveAttack(List<GarbageRow> rows) {
+        Objects.requireNonNull(rows);
+        for (GarbageRow row : rows) {
+            if (row == null || row.getColumns() != board.getColumns())
+                throw new IllegalArgumentException("공격 줄의 크기가 보드와 다릅니다.");
+        }
+        return state == GameState.RUNNING ? incoming.receive(rows) : 0;
+    }
+    public boolean isAttackQueueFull() { return incoming.isFull(); }
+    public List<GarbageRow> getPendingRows() { return incoming.getPendingRows(); }
 
     public Game() {
         this(GameSettings.DEFAULT);
@@ -321,6 +341,12 @@ public class Game {
         }
         score += scorePolicy.lockedBlock(result, currentBlock.getItemType(), getDifficulty(), speed);
         clearedLines += result.totalRowsCleared();
+        // 공격 가능 여부는 보드 결과를 따른다. M은 점수만 바꾸므로 줄 삭제 공격도 유지한다.
+        if (!result.attackRows().isEmpty()) attackListener.accept(result.attackRows());
+        if (incoming.insertInto(board)) {
+            state = GameState.GAME_OVER;
+            return;
+        }
         takeNext();
         // 기존 Next는 그대로 Current로 넘긴 뒤 새 Next에 아이템을 반영한다.
         spawner.onLinesCleared(result.totalRowsCleared());

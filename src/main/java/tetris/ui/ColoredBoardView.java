@@ -50,6 +50,7 @@ public final class ColoredBoardView extends VBox {
             cells[row][col].setText((silhouette ? 'O' : symbol) + " ");
             Color color = silhouette ? Color.GRAY : cell.isEmpty() ? Color.DIMGRAY
                     : cell == Cell.WEIGHT ? Color.WHITESMOKE
+                    : cell == Cell.GARBAGE ? Color.GRAY
                     : Color.web(TetrominoType.valueOf(cell.name()).getColorHex(colorBlindMode));
             cells[row][col].setFill(flashingRows.contains(row)
                     ? (flashOn ? Color.WHITE : Color.TRANSPARENT) : color);

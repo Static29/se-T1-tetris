@@ -93,7 +93,7 @@ class GameplayPreferencesTest {
         var store = new SettingsStore(directory.resolve("settings"));
         store.save(settings);
         assertEquals(settings, store.load());
-        assertEquals("LEFT", KeyBindings.defaults().key(GameAction.LEFT));
+        assertEquals("A", KeyBindings.defaults().key(GameAction.LEFT));
         assertThrows(IllegalArgumentException.class, () -> keys.with(GameAction.RIGHT, "A"));
         assertThrows(IllegalArgumentException.class, () -> keys.with(GameAction.RIGHT, "ENTER"));
         assertThrows(UnsupportedOperationException.class, () -> keys.keys().put(GameAction.LEFT, "B"));

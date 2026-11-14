@@ -9,6 +9,16 @@ import tetris.block.TetrominoType;
 import static org.junit.jupiter.api.Assertions.*;
 
 class BoardDimensionsTest {
+    @Test void garbageIsGrayInBothPalettes() {
+        var view = new ColoredBoardView(1, 1);
+        for (boolean colorBlind : new boolean[] {false, true}) {
+            view.render(new Cell[][] {{Cell.GARBAGE}}, colorBlind);
+            var row = (javafx.scene.layout.HBox) view.getChildren().get(1);
+            var cell = (javafx.scene.text.Text) row.getChildren().get(1);
+            assertEquals(javafx.scene.paint.Color.GRAY, cell.getFill());
+            assertEquals("O ", cell.getText());
+        }
+    }
     @Test void customBoardSizeIsSharedByTextColorAndGameViews() {
         Board board = new Board(12, 4, 8);
         Cell[][] snapshot = board.getVisibleCells();
