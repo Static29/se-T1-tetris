@@ -26,7 +26,7 @@ final class BombItemEffect implements ItemEffect {
         List<Position> targets = targets(board, item);
         boolean multiplierApplied = targets.stream().anyMatch(board::isMultiplier);
         int cellsRemoved = board.removeCells(targets);
-        return new Outcome(0, cellsRemoved, multiplierApplied);
+        return Outcome.cellsRemoved(cellsRemoved, multiplierApplied);
     }
 
     /** 폭탄 칸 자신과, 주변 8칸 중 찬 칸에서 무작위로 고른 최대 REMOVE_COUNT개. */

@@ -1,5 +1,7 @@
 package tetris.board;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 import java.util.random.RandomGenerator;
 import org.junit.jupiter.api.Test;
@@ -207,5 +209,120 @@ class BlockLockerTest {
         assertThrows(NullPointerException.class, () -> locker.lock(new Board(), null));
         assertThrows(NullPointerException.class, () -> BlockLocker.cellOf(null));
         assertThrows(IllegalArgumentException.class, () -> new LockResult(false, -1, 0, 0, false));
+        assertThrows(NullPointerException.class, () -> new LockResult(false, 0, 0, 0, false, null));
+    }
+
+    // ---- 대전 모드 공격 줄(Req3) ----
+    // T를 원점 (3, 4)에 두면 (4,4), (5,3), (5,4), (5,5)를 차지한다.
+
+    /** row 줄을 emptyCols만 남기고 J로 채운다. */
+    private static void fillExcept(Board board, int row, Integer... emptyCols) {
+        List<Integer> empty = List.of(emptyCols);
+        List<Position> line = new ArrayList<>();
+        for (int col = 0; col < board.getColumns(); col++) {
+            if (!empty.contains(col)) {
+                line.add(new Position(row, col));
+            }
+        }
+        board.lock(line, Cell.J);
+    }
+
+    /** holeCols만 빈 10칸짜리 공격 줄. */
+    private static GarbageRow holes(Integer... holeCols) {
+        return GarbageRow.withHoles(10, List.of(holeCols));
+    }
+
+    /** 원점 (3, 4)에 있는 T. item이 null이면 일반 블록. */
+    private static Block tBlock(ItemType item, int itemIndex) {
+        if (item == null) {
+            return new Block(TetrominoType.T, 3, 4);
+        }
+        return new ItemBlockFactory(fixed(itemIndex)).create(true, TetrominoType.T, item, 3, 4);
+    }
+
+    @Test
+    void twoFullRowsAreSentWithHolesWhereTheLastBlockWas() {
+        Board board = new Board(6, 0, 10);
+        fillExcept(board, 4, 4);
+        fillExcept(board, 5, 3, 4, 5);
+        board.lock(positions(3, 0), Cell.S);
+        LockResult result = locker.lock(board, tBlock(null, 0));
+        assertEquals(2, result.fullRowsCleared());
+        assertEquals(List.of(holes(4), holes(3, 4, 5)), result.attackRows(), "위에서 아래 순서");
+        assertEquals(Cell.S, board.getCell(5, 0));
+    }
+
+    @Test
+    void oneRowIsNotSent() {
+        Board board = new Board(6, 0, 10);
+        fillExcept(board, 5, 3, 4, 5);
+        LockResult result = locker.lock(board, tBlock(null, 0));
+        assertEquals(1, result.fullRowsCleared());
+        assertEquals(List.of(), result.attackRows());
+    }
+
+    @Test
+    void lineClearRowIsSentFilledExceptTheBlockCellsAndCountsWithFullRows() {
+        // L이 아래 줄(row 5)에 붙은 T를 고른다. row 5는 L로 지워지고, 내려온 row 4는 꽉 차서 지워진다.
+        int index = 0;
+        while (Position.fromXY(tBlock(ItemType.LINE_CLEAR, index).getBoardItemCells()).get(0).row() != 5) {
+            index++;
+        }
+        Board board = new Board(6, 0, 10);
+        fillExcept(board, 4, 4);
+        board.lock(positions(5, 0, 5, 1), Cell.J);
+        LockResult result = locker.lock(board, tBlock(ItemType.LINE_CLEAR, index));
+        assertEquals(1, result.itemRowsCleared());
+        assertEquals(1, result.fullRowsCleared());
+        // L 줄(row 5)은 원래 비어 있던 칸도 채워서 보내고, T가 있던 3~5칸만 비운다.
+        assertEquals(List.of(holes(4), holes(3, 4, 5)), result.attackRows());
+    }
+
+    @Test
+    void fillRowsAreSentWithFilledCellsAndBlockCellsEmpty() {
+        // I가 row 3, col 3~6. F(col 4)가 (4,4), (5,4)를 채워 3줄이 모두 찬다.
+        Board board = new Board(6, 0, 10);
+        fillExcept(board, 3, 3, 4, 5, 6);
+        fillExcept(board, 4, 4);
+        fillExcept(board, 5, 4);
+        LockResult result = locker.lock(board, iBlock(3, 2, ItemType.FILL, 1));
+        assertEquals(3, result.fullRowsCleared());
+        assertEquals(List.of(holes(3, 4, 5, 6), holes(4), holes(4)), result.attackRows());
+    }
+
+    @Test
+    void multiplierBlockAttacksLikeANormalBlockAndOldMarksAreSentFilled() {
+        Board board = new Board(6, 0, 10);
+        fillExcept(board, 4, 4);
+        fillExcept(board, 5, 3, 4, 5);
+        board.markMultiplier(new Position(5, 0));
+        LockResult result = locker.lock(board, tBlock(ItemType.MULTIPLIER, 0));
+        assertTrue(result.multiplierApplied());
+        assertEquals(List.of(holes(4), holes(3, 4, 5)), result.attackRows());
+    }
+
+    @Test
+    void bombBlockNeverAttacks() {
+        // 세로 I. 폭탄 주변 칸이 지워져도 폭탄에서 먼 두 줄은 꽉 차서 지워진다.
+        Board board = new Board(8, 0, 10);
+        Block bomb = new ItemBlockFactory(fixed(0)).create(true, TetrominoType.I, ItemType.BOMB, 3, 4);
+        bomb.rotate();
+        for (Position cell : Position.fromXY(bomb.getBoardCells())) {
+            fillExcept(board, cell.row(), cell.col());
+        }
+        LockResult result = locker.lock(board, bomb);
+        assertTrue(result.fullRowsCleared() >= BlockLocker.MIN_ATTACK_ROWS);
+        assertEquals(List.of(), result.attackRows());
+    }
+
+    @Test
+    void weightNeverAttacks() {
+        // 무게추를 원점 (3, 4)에 두면 (4,4), (4,5), (5,3)~(5,6)을 차지한다.
+        Board board = new Board(6, 0, 10);
+        fillExcept(board, 4, 4, 5);
+        fillExcept(board, 5, 3, 4, 5, 6);
+        LockResult result = locker.lock(board, new ItemBlockFactory().create(true, null, ItemType.WEIGHT, 3, 4));
+        assertEquals(2, result.fullRowsCleared());
+        assertEquals(List.of(), result.attackRows());
     }
 }

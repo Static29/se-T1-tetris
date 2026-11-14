@@ -243,6 +243,40 @@ public class Board {
         return false;
     }
 
+    /**
+     * 대전 모드 공격 줄을 보드 맨 아래에 넣고, 기존 줄을 그만큼 위로 밀어올린다(Req3).
+     * rows의 첫 줄이 위쪽, 마지막 줄이 보드 맨 아래 줄이 된다. 찬 칸은 Cell.GARBAGE로 채운다.
+     * 블록을 고정한 뒤, 다음 블록을 생성하기 전에 호출한다(움직이는 블록이 없을 때).
+     *
+     * @return 찬 칸이 버퍼 위(보드 밖)로 밀려나 사라졌으면 true. 이때는 게임 오버로 처리한다(팀 결정)
+     */
+    public boolean pushUpGarbage(List<GarbageRow> rows) {
+        Objects.requireNonNull(rows, "rows");
+        if (rows.size() > cells.length) {
+            throw new IllegalArgumentException("보드 높이보다 많은 줄은 넣을 수 없습니다: " + rows.size());
+        }
+        for (GarbageRow row : rows) {
+            Objects.requireNonNull(row, "rows의 원소");
+            if (row.getColumns() != columns) {
+                throw new IllegalArgumentException("공격 줄의 칸 수가 보드와 다릅니다: " + row.getColumns());
+            }
+        }
+        int count = rows.size();
+        boolean overflow = false;
+        for (int row = 0; row < count; row++) {
+            overflow |= countFilledCells(row) > 0;
+        }
+        for (int row = count; row < cells.length; row++) {
+            moveRow(row, row - count);
+        }
+        for (int i = 0; i < count; i++) {
+            int row = cells.length - count + i;
+            cells[row] = rows.get(i).toCells();
+            multiplierMarks[row] = new boolean[columns];
+        }
+        return overflow;
+    }
+
     /** 모든 칸을 비운다. 새 게임을 시작할 때 사용한다. */
     public void clear() {
         fillEmptyRows(0, cells.length);

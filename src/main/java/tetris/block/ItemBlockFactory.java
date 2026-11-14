@@ -20,16 +20,21 @@ public final class ItemBlockFactory {
         requireItemMode(itemMode);
         Objects.requireNonNull(baseType, "baseType");
         ItemType[] items = ItemType.values();
-        return create(itemMode, baseType, items[random.nextInt(items.length)], x, y);
+        return createItem(baseType, items[random.nextInt(items.length)], x, y);
     }
 
     /** 특정 아이템 생성용. 무게추는 baseType을 사용하지 않는다. */
     public Block create(boolean itemMode, TetrominoType baseType, ItemType item, int x, int y) {
         requireItemMode(itemMode);
         Objects.requireNonNull(item, "item");
+        return createItem(baseType, item, x, y);
+    }
+
+    /** 검증을 통과한 요청의 생성 경로를 공유한다. 난수 선택 순서는 기존과 같다. */
+    private Block createItem(TetrominoType baseType, ItemType item, int x, int y) {
         if (item == ItemType.WEIGHT) return Block.weight(x, y);
         Objects.requireNonNull(baseType, "baseType");
-        return Block.withItem(baseType, x, y, item, random.nextInt(baseType.getCells().length));
+        return Block.withItem(baseType, x, y, item, random.nextInt(baseType.cellCount()));
     }
 
     private static void requireItemMode(boolean itemMode) {

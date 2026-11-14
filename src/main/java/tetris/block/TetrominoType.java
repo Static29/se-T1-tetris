@@ -7,40 +7,56 @@ package tetris.block;
  */
 public enum TetrominoType {
     // ####
-    I(new int[][] {{0, 0}, {1, 0}, {2, 0}, {3, 0}}, "#00FFFF", "#56B4E9"),
+    I(new int[][] {{0, 0}, {1, 0}, {2, 0}, {3, 0}}, "#00FFFF", "#56B4E9", 4, 1),
 
     // ##
     // ##
-    O(new int[][] {{0, 0}, {1, 0}, {0, 1}, {1, 1}}, "#FFFF00", "#F0E442"),
+    O(new int[][] {{0, 0}, {1, 0}, {0, 1}, {1, 1}}, "#FFFF00", "#F0E442", 2, 0),
 
     // .#.
     // ###
-    T(new int[][] {{1, 0}, {0, 1}, {1, 1}, {2, 1}}, "#EE82EE", "#CC79A7"),
+    T(new int[][] {{1, 0}, {0, 1}, {1, 1}, {2, 1}}, "#EE82EE", "#CC79A7", 3, 0),
 
     // .##
     // ##.
-    S(new int[][] {{1, 0}, {2, 0}, {0, 1}, {1, 1}}, "#00FF00", "#009E73"),
+    S(new int[][] {{1, 0}, {2, 0}, {0, 1}, {1, 1}}, "#00FF00", "#009E73", 3, 0),
 
     // ##.
     // .##
-    Z(new int[][] {{0, 0}, {1, 0}, {1, 1}, {2, 1}}, "#FA8072", "#D55E00"),
+    Z(new int[][] {{0, 0}, {1, 0}, {1, 1}, {2, 1}}, "#FA8072", "#D55E00", 3, 0),
 
     // #..
     // ###
-    J(new int[][] {{0, 0}, {0, 1}, {1, 1}, {2, 1}}, "#6495ED", "#0072B2"),
+    J(new int[][] {{0, 0}, {0, 1}, {1, 1}, {2, 1}}, "#6495ED", "#0072B2", 3, 0),
 
     // ..#
     // ###
-    L(new int[][] {{2, 0}, {0, 1}, {1, 1}, {2, 1}}, "#FFA500", "#E69F00");
+    L(new int[][] {{2, 0}, {0, 1}, {1, 1}, {2, 1}}, "#FFA500", "#E69F00", 3, 0);
 
     private final int[][] cells;
     private final String normalColorHex;
     private final String colorBlindColorHex;
+    private final int frameSize;
+    private final int spawnYOffset;
 
-    TetrominoType(int[][] cells, String normalColorHex, String colorBlindColorHex) {
+    TetrominoType(int[][] cells, String normalColorHex, String colorBlindColorHex,
+                  int frameSize, int spawnYOffset) {
         this.cells = cells;
         this.normalColorHex = normalColorHex;
         this.colorBlindColorHex = colorBlindColorHex;
+        this.frameSize = frameSize;
+        this.spawnYOffset = spawnYOffset;
+    }
+
+    // 패키지 내부의 생성·회전용 정보. 공개 getCells()의 기본 좌표는 그대로 유지한다.
+    int frameSize() { return frameSize; }
+    int cellCount() { return cells.length; }
+    boolean canRotate() { return this != O; }
+
+    int[][] spawnCells() {
+        int[][] result = getCells();
+        for (int[] cell : result) cell[1] += spawnYOffset;
+        return result;
     }
 
     /** 기존 JavaFX 미리보기와 같은 일반 색상. UI에서 Color.web으로 변환한다. */
