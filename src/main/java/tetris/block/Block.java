@@ -13,14 +13,14 @@ public class Block {
     private int[][] cells;
     private final ItemType itemType;
     private final int itemCellIndex;
-    private int rotationState;
+    private RotationState rotationState = RotationState.SPAWN;
 
     public Block(TetrominoType type) {
         this(type, 0, 0);
     }
 
     public Block(TetrominoType type, int x, int y) {
-        this(Objects.requireNonNull(type, "type"), x, y, spawnCells(type), null, -1);
+        this(Objects.requireNonNull(type, "type"), x, y, type.spawnCells(), null, -1);
     }
 
     private Block(TetrominoType type, int x, int y, int[][] cells,
@@ -28,7 +28,7 @@ public class Block {
         this.type = type;
         this.x = x;
         this.y = y;
-        this.cells = translated(cells, 0, 0);
+        this.cells = copyCells(cells);
         this.itemType = itemType;
         this.itemCellIndex = itemCellIndex;
     }
@@ -37,7 +37,7 @@ public class Block {
         Objects.requireNonNull(type, "type");
         Objects.requireNonNull(item, "item");
         if (item == ItemType.WEIGHT) throw new IllegalArgumentException("무게추는 별도 모양입니다.");
-        int[][] cells = spawnCells(type);
+        int[][] cells = type.spawnCells();
         if (cellIndex < 0 || cellIndex >= cells.length) throw new IllegalArgumentException("잘못된 아이템 칸");
         return new Block(type, x, y, cells, item, cellIndex);
     }
@@ -87,21 +87,20 @@ public class Block {
     /** 아이템 종류와 부착 칸은 유지하고 생성 위치·방향으로 초기화한 복사본. */
     public Block spawnCopy(int x, int y) {
         if (itemType == ItemType.WEIGHT) return weight(x, y);
-        return new Block(type, x, y, spawnCells(type), itemType, itemCellIndex);
+        return new Block(type, x, y, type.spawnCells(), itemType, itemCellIndex);
     }
 
     /** 0=생성 방향, 1=R, 2=180도, 3=L. O와 무게추는 0을 유지한다. */
-    public int getRotationState() { return rotationState; }
+    public int getRotationState() { return rotationState.code(); }
 
     /** 빈칸을 포함한 고정 회전 공간 크기. x/y는 이 공간의 왼쪽 위다. */
     public int getFrameSize() {
-        if (type == TetrominoType.I || itemType == ItemType.WEIGHT) return 4;
-        return type == TetrominoType.O ? 2 : 3;
+        return itemType == ItemType.WEIGHT ? 4 : type.frameSize();
     }
 
     /** 현재 모양의 {x, y} 상대 좌표 복사본을 반환한다. */
     public int[][] getCells() {
-        return translated(cells, 0, 0);
+        return copyCells(cells);
     }
 
     /** 보드상의 {x, y} 절대 좌표를 반환한다. Position으로 변환할 때는 (y, x) 순서다. */
@@ -131,7 +130,7 @@ public class Block {
      */
     public int[][] getRotationOffsets() {
         if (!canChangeOrientation()) return new int[][] {{0, 0}};
-        return SrsRotation.clockwiseOffsets(type, rotationState);
+        return SrsRotation.clockwiseOffsets(type, rotationState.code());
     }
 
     /** 상태 변경 없이 지정 후보의 회전 후 보드 절대 좌표를 반환한다. */
@@ -151,7 +150,7 @@ public class Block {
         cells = rotatedCells();
         x += offset[0];
         y += offset[1];
-        if (canChangeOrientation()) rotationState = (rotationState + 1) % 4;
+        if (canChangeOrientation()) rotationState = rotationState.clockwise();
     }
 
     /** 점유 칸만 감싼 너비/높이. 상대 좌표에는 앞쪽 빈 행/열이 남을 수 있다. */
@@ -182,7 +181,7 @@ public class Block {
     }
 
     private boolean canChangeOrientation() {
-        return type != TetrominoType.O && itemType != ItemType.WEIGHT;
+        return itemType != ItemType.WEIGHT && type.canRotate();
     }
 
     private int[] rotationOffset(int candidateIndex) {
@@ -193,9 +192,10 @@ public class Block {
         return offsets[candidateIndex];
     }
 
-    private static int[][] spawnCells(TetrominoType type) {
-        // I는 4x4 공간의 두 번째 행에 놓아 중심 (1.5, 1.5)를 유지한다.
-        return translated(type.getCells(), 0, type == TetrominoType.I ? 1 : 0);
+    private static int[][] copyCells(int[][] source) {
+        int[][] result = new int[source.length][];
+        for (int i = 0; i < source.length; i++) result[i] = source[i].clone();
+        return result;
     }
 
     private static int[][] translated(int[][] source, int dx, int dy) {
