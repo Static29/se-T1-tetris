@@ -15,7 +15,7 @@
 | 클래스 | 역할 |
 | --- | --- |
 | `Board` | 고정된 칸만 저장(보이는 20줄 + 버퍼 2줄 × 10칸). 충돌·고정·줄 삭제·Block out/Lock out·M 표시 |
-| `Cell` / `Position` | 칸 종류(EMPTY, 7종, WEIGHT) / 보드 절대 좌표와 `{x, y}` 변환 |
+| `Cell` / `Position` | 칸 종류(EMPTY, 7종, WEIGHT, GARBAGE) / 보드 절대 좌표와 `{x, y}` 변환 |
 | `BlockRotation` | Block이 주는 SRS 회전 후보를 0번부터 `canPlace`로 검사해 첫 성공 후보 적용 |
 | `PieceSelector` | Roulette Wheel Selection으로 다음 종류 선택. 가방(7-bag) 없이 매번 독립 추첨 |
 | `BlockSpawner` | Next를 미리 정해 두고 생성 위치(`SPAWN_Y` = 0)에 놓아 내보냄. 대기 아이템이 있으면 Next를 아이템으로 교체 |
@@ -26,6 +26,9 @@
 | `ItemEffect` (내부) | 아이템 한 종류의 효과. `LineClearItemEffect`·`FillItemEffect`·`BombItemEffect`·`MultiplierItemEffect` |
 | `LineClearEffect` | 줄 삭제 직전 화면과 지울 줄 번호(삭제 연출용). `BlockLocker.lock(board, block, effects)`가 넘김 |
 | `WeightMover` | 무게추 전용 이동(닿기 전까지만 좌우, 지나가며 칸 삭제, 바닥 착지) |
+| `GarbageRow` | 대전 모드 공격 줄 한 줄(칸마다 찼는지만). 보드에 들어가면 찬 칸은 `Cell.GARBAGE` |
+| `GarbageQueue` | 받은 공격 줄 대기열. 최대 10줄, 가득 차면 무시, 넘치면 새 공격의 아래쪽을 잘라냄 |
+| `AttackRowBuilder` (내부) | 고정 중 지운 줄을 공격 줄로 변환(비울 칸 계산, L로 내려온 줄 번호 추적) |
 
 ## 난이도별 값
 
@@ -53,6 +56,9 @@
 | 속도·아이템 카운트 | `LockResult.totalRowsCleared()` → `spawner.onLinesCleared(...)` | L로 지운 줄도 포함 |
 | 무게추 | `WeightMover`, `FallSpeed.getWeightIntervalMillis` | 무게추 Hold 금지(게임 결정) |
 | 화면 | `board.getVisibleCells()`, `board.isMultiplier(row, col)`, `BlockLocker.cellOf(block)` | 무게추는 `getType()`이 null이라 `cellOf`로 `Cell.WEIGHT` 변환 |
+| 대전: 공격 | `LockResult.attackRows()` → 상대 `GarbageQueue.receive(...)` | 빈 목록이면 보낼 것 없음. 다인 모드는 `isFull()`로 대상 고르기 |
+| 대전: 받은 줄 반영 | `garbageQueue.insertInto(board)` | 고정 후·다음 생성 전. `true`면 넘쳐서 게임 오버 |
+| 대전: 대기 줄 표시 | `garbageQueue.getPendingRows()` | 위에서 아래 순서 |
 
 생성 위치는 `BlockSpawner` 한 곳에서만 정한다(2026-11-07 팀 결정). 이전에는 `spawn()`이 블록 맨 윗줄을
 화면 첫 줄(row 2)에 놓고 Game이 `spawnCopy(가운데, 0)`로 다시 놓아 두 곳에서 위치를 계산했다.
@@ -67,18 +73,32 @@
 | M 점수 배율 | 고정된 칸에 배율 표시. 줄 삭제·L·B로 사라지면 그 고정의 점수 전체 2배(중복 없음) | `multiplierApplied` |
 | 무게추 | 회전 불가, 닿기 전까지만 좌우 이동, 지나가며 아래 칸 삭제, 바닥 착지 후 고정 여유, 1.5배 속도 | 지운 칸 0점. 그때 사라진 M도 배율 없음. 착지로 줄이 차면 일반 줄 점수 |
 
+## 대전 모드 공격 줄 (Req3, 팀 결정 2026-11-12)
+
+한 블록을 고정하며 지운 줄(L 줄 + 꽉 찬 줄)이 `BlockLocker.MIN_ATTACK_ROWS`(2)줄 이상이면 그 줄들을 위아래 순서 그대로 보낸다.
+
+| 고정한 블록 | 보내는가 | 공격 줄에서 비우는 칸 |
+| --- | --- | --- |
+| 일반·M | 예 | 방금 놓은 블록의 칸. 예전에 남아 있던 M 칸은 채워서 보냄 |
+| L | 예 | L 줄: L 블록이 있던 칸만 비우고 나머지는 원래 비어 있었어도 채움. 같이 지운 꽉 찬 줄: 블록 칸 |
+| F | 예 | F가 채운 칸 + 블록 칸 |
+| B·무게추 | 아니요 | - |
+
+받은 줄은 `GarbageQueue`에 모였다가 고정 후·다음 생성 전에 `Board.pushUpGarbage`로 맨 아래에 들어가고 기존 칸은 위로 밀린다.
+찬 칸이 버퍼 위로 밀려나면 `true`를 돌려주며 게임 오버로 처리한다.
+
 새 부착형 아이템을 추가하는 순서:
 1. `ItemType`(블록 담당)에 종류와 문자를 추가한다.
 2. board에 `ItemEffect`를 구현한 클래스를 하나 만든다(효과 적용 + `Outcome`으로 점수 재료 반환).
-3. `BlockLocker.effectOf`의 switch에 case를 하나 추가한다. 빠뜨리면 컴파일 오류로 알려 준다.
+3. `BlockLocker.effectOf`와 `canAttack`의 switch에 case를 하나씩 추가한다. 빠뜨리면 컴파일 오류로 알려 준다.
 
-"(내부)" 표시 클래스는 package-private이라 board 밖에서는 보이지 않는다. Game은 `BlockLocker`·`BlockSpawner`만 쓴다.
+"(내부)" 표시 클래스는 package-private이라 board 밖에서는 보이지 않는다. Game은 `BlockLocker`·`BlockSpawner`(대전 모드는 `GarbageQueue`도)만 쓴다.
 
 ## 검증
 
 board 테스트는 `src/test/java/tetris/board`에 있다. 여러 테스트가 같이 쓰는 좌표·채우기 도우미는 `BoardFixtures`에 둔다.
 
 - 기능: `BoardTest`, `PositionTest`, `BlockRotationTest`, `BlockSpawnerTest`, `FallSpeedTest`, `LockDelayTest`,
-  `BlockLockerTest`, `WeightMoverTest`, `ItemCounterTest`
+  `BlockLockerTest`(공격 줄 포함), `WeightMoverTest`, `ItemCounterTest`, `GarbageRowTest`, `GarbageQueueTest`
 - 확률(Req2 5쪽): `PieceSelectorTest`·`BlockSpawnerTest` — 100,000회 추첨, 기대 횟수 대비 ±5%, 시드 고정
 - 비기능(성능): `BoardPerformanceTest` — 블록 1,000개 처리, 4줄 삭제·복사 1,000회 각각 1초 이내

@@ -11,6 +11,6 @@ final class LineClearItemEffect implements ItemEffect {
         boolean multiplierApplied = board.hasMultiplierInRow(row);
         effects.accept(new LineClearEffect(board.getVisibleCells(), List.of(row)));
         int cellsRemoved = board.clearRow(row);
-        return new Outcome(1, cellsRemoved, multiplierApplied);
+        return Outcome.rowCleared(row, cellsRemoved, multiplierApplied);
     }
 }

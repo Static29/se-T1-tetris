@@ -9,8 +9,12 @@ import tetris.block.ItemType;
 
 /**
  * 블록을 보드에 고정하고, 붙어 있는 아이템의 효과와 줄 삭제까지 한 번에 처리한다.
- * 점수는 계산하지 않고 LockResult로 재료(줄 수·칸 수·배율 여부)만 돌려준다.
- * 처리 순서: 고정 → Lock out 검사 → 아이템 효과 → 꽉 찬 줄 삭제.
+ * 점수는 계산하지 않고 LockResult로 재료(줄 수·칸 수·배율 여부)와 대전 모드 공격 줄만 돌려준다.
+ * 처리 순서: 고정 → Lock out 검사 → 아이템 효과 → 꽉 찬 줄 삭제 → 공격 줄 결정.
+ *
+ * <p>대전 모드 공격(Req3): 이 블록으로 지운 줄(L 줄 + 꽉 찬 줄)이 MIN_ATTACK_ROWS줄 이상이면 그 줄들을 공격 줄로 돌려준다.
+ * 방금 놓은 블록 칸과 F가 채운 칸은 비워서 보내고, L 줄은 그 밖의 칸을 모두 채워 보낸다.
+ * B·무게추로 고정한 경우는 줄을 지워도 보내지 않는다(팀 결정).
  *
  * <p>아이템별 효과는 ItemEffect 구현 클래스가 맡고, 이 클래스는 순서와 결과 합치기만 한다.
  * <ul>
@@ -19,6 +23,9 @@ import tetris.block.ItemType;
  * </ul>
  */
 public final class BlockLocker {
+    /** 상대에게 공격 줄을 보내려면 한 번에 지워야 하는 최소 줄 수(Req3). */
+    public static final int MIN_ATTACK_ROWS = 2;
+
     private static final ItemEffect LINE_CLEAR = new LineClearItemEffect();
     private static final ItemEffect FILL = new FillItemEffect();
     private static final ItemEffect MULTIPLIER = new MultiplierItemEffect();
@@ -59,15 +66,33 @@ public final class BlockLocker {
             return LockResult.LOCK_OUT;
         }
 
+        AttackRowBuilder attack = new AttackRowBuilder(board, positions);
         ItemEffect.Outcome item = applyItem(board, block, cell, effects);
+        attack.addHoles(item.filledCells());
+        item.clearedRows().forEach(attack::rowCleared);
         boolean multiplierApplied = item.multiplierApplied();
         List<Integer> fullRows = board.findFullRows();
         if (!fullRows.isEmpty()) {
             multiplierApplied |= fullRows.stream().anyMatch(board::hasMultiplierInRow);
             effects.accept(new LineClearEffect(board.getVisibleCells(), fullRows));
         }
+        attack.fullRowsCleared(fullRows);
         int fullRowsCleared = board.clearFullRows().size();
-        return new LockResult(false, fullRowsCleared, item.rowsCleared(), item.cellsRemoved(), multiplierApplied);
+        List<GarbageRow> attackRows = canAttack(block) && attack.size() >= MIN_ATTACK_ROWS
+                ? attack.rows() : List.of();
+        return new LockResult(false, fullRowsCleared, item.rowsCleared(), item.cellsRemoved(),
+                multiplierApplied, attackRows);
+    }
+
+    /** 이 블록으로 지운 줄을 상대에게 보낼 수 있는지. 아이템이 없는 블록은 보낸다. B·무게추는 보내지 않는다(팀 결정). */
+    private static boolean canAttack(Block block) {
+        if (!block.hasItem()) {
+            return true;
+        }
+        return switch (block.getItemType()) {
+            case LINE_CLEAR, FILL, MULTIPLIER -> true;
+            case BOMB, WEIGHT -> false;
+        };
     }
 
     /** 부착 아이템이 있으면 그 칸에 효과를 적용한다. 일반 블록과 무게추는 부착 칸이 없어 NONE. */

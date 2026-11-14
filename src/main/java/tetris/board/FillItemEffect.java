@@ -7,6 +7,7 @@ import java.util.function.Consumer;
 /**
  * F(빈칸 채우기): F 바로 아래부터 바닥까지 같은 열의 빈칸을 그 블록 종류로 채운다. 위쪽은 채우지 않는다.
  * 자체 점수는 없고, 채워서 줄이 차면 BlockLocker의 꽉 찬 줄 삭제에서 일반 줄 점수가 된다.
+ * 채운 칸은 대전 모드 공격 줄에서 빈칸으로 보낸다(팀 결정).
  */
 final class FillItemEffect implements ItemEffect {
     @Override
@@ -17,9 +18,10 @@ final class FillItemEffect implements ItemEffect {
                 emptyBelow.add(new Position(row, item.col()));
             }
         }
-        if (!emptyBelow.isEmpty()) {
-            board.lock(emptyBelow, cell);
+        if (emptyBelow.isEmpty()) {
+            return Outcome.NONE;
         }
-        return Outcome.NONE;
+        board.lock(emptyBelow, cell);
+        return Outcome.filled(emptyBelow);
     }
 }
