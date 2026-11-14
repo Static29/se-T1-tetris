@@ -370,4 +370,40 @@ class BoardTest {
         board.clear();
         assertFalse(board.isMultiplier(2, 2));
     }
+
+    @Test
+    void pushUpGarbageMovesRowsAndMarksUpTogether() {
+        Board board = new Board(3, 0, 3);
+        board.lock(positions(2, 1), Cell.T);
+        board.markMultiplier(new Position(2, 1));
+        assertFalse(board.pushUpGarbage(List.of(GarbageRow.withHoles(3, List.of(0)))));
+        assertEquals(Cell.T, board.getCell(1, 1));
+        assertTrue(board.isMultiplier(1, 1), "배율 표시도 칸과 함께 올라간다");
+        assertTrue(board.isEmpty(2, 0));
+        assertEquals(Cell.GARBAGE, board.getCell(2, 1));
+        assertFalse(board.isMultiplier(2, 1), "공격 줄에는 배율 표시가 없다");
+        assertEquals("...\n.T.\n.GG\n", board.toString());
+    }
+
+    @Test
+    void pushUpGarbageReportsOverflowOnlyWhenFilledCellsLeaveTheBoard() {
+        Board board = new Board(3, 1, 3);
+        board.lock(positions(1, 0), Cell.T);
+        GarbageRow row = GarbageRow.withHoles(3, List.of(1));
+        assertFalse(board.pushUpGarbage(List.of(row)), "버퍼(row 0)까지 올라온 것은 넘침이 아니다");
+        assertEquals(Cell.T, board.getCell(0, 0));
+        assertTrue(board.pushUpGarbage(List.of(row)), "버퍼 위로 밀려나면 넘침");
+        assertFalse(board.pushUpGarbage(List.of()), "빈 목록은 아무것도 하지 않는다");
+    }
+
+    @Test
+    void pushUpGarbageRejectsInvalidRows() {
+        Board board = new Board(3, 0, 3);
+        GarbageRow wide = GarbageRow.withHoles(4, List.of(0));
+        GarbageRow row = GarbageRow.withHoles(3, List.of(0));
+        assertThrows(NullPointerException.class, () -> board.pushUpGarbage(null));
+        assertThrows(IllegalArgumentException.class, () -> board.pushUpGarbage(List.of(wide)));
+        assertThrows(IllegalArgumentException.class, () -> board.pushUpGarbage(List.of(row, row, row, row)));
+        assertThrows(NullPointerException.class, () -> board.pushUpGarbage(Arrays.asList((GarbageRow) null)));
+    }
 }
