@@ -30,6 +30,7 @@ public class ScreenController {
     private final StackPane viewport = new StackPane();
     private final Group scaledContent = new Group();
     private Parent activeScreen;
+    private double contentWidth = 800, contentHeight = 720;
     private final SettingsStore settingsStore;
     private final LeaderboardStore leaderboardStore;
     private GameSettings settings = GameSettings.DEFAULT;
@@ -72,12 +73,14 @@ public class ScreenController {
         stage.setFullScreenExitKeyCombination(KeyCombination.NO_MATCH);
         stage.setFullScreenExitHint("");
         stage.setScene(scene);
+        stage.addEventHandler(javafx.stage.WindowEvent.WINDOW_HIDDEN, event -> closeBattle());
         applyScreenSize();
     }
 
     public void showMainMenu() {
         MainMenuView menu = new MainMenuView(
                 this::startGame,
+                this::showMultiplayerMenu,
                 this::showSettings,
                 () -> showLeaderboard(null, ""),
                 Platform::exit);
@@ -85,7 +88,18 @@ public class ScreenController {
     }
 
     public void startGame() {
-        Game game = new Game(settings);
+        showScreen(new SoloSetupView(settings, this::startGame, this::showMainMenu));
+    }
+
+    private void showMultiplayerMenu() {
+        showScreen(new MultiplayerMenuView(
+                () -> showScreen(new BattleSetupView(settings,
+                        match -> showScreen(new LocalBattleView(match, match.games().get(0).getSettings(), this::showMultiplayerMenu)), this::showMultiplayerMenu)),
+                () -> showScreen(new NetworkBattleView(settings, this::showMultiplayerMenu)), this::showMainMenu));
+    }
+
+    private void startGame(GameSettings selected) {
+        Game game = new Game(selected);
         game.start();
         UUID resultId = UUID.randomUUID();
         showScreen(new GameView(game, this::showMainMenu, Platform::exit, name -> {
@@ -128,16 +142,16 @@ public class ScreenController {
     }
 
     private void showScreen(Parent screen) {
-        if (screen instanceof MainMenuView menu) {
-            menu.setDifficulty(settings.difficulty());
-            menu.setMode(settings.mode());
-        }
+        if (screen != activeScreen) closeBattle();
         if (screen instanceof GameView game) game.applyPreferences(settings);
         activeScreen = screen;
+        contentWidth = screen instanceof LocalBattleView battle ? battle.contentWidth()
+                : screen instanceof NetworkBattleView ? 1100 : 800;
+        contentHeight = screen instanceof NetworkBattleView ? 950 : screen instanceof LocalBattleView ? 850 : 720;
         if (screen instanceof Region region) {
-            region.setMinSize(800, 720);
-            region.setPrefSize(800, 720);
-            region.setMaxSize(800, 720);
+            region.setMinSize(contentWidth, contentHeight);
+            region.setPrefSize(contentWidth, contentHeight);
+            region.setMaxSize(contentWidth, contentHeight);
         }
         scaledContent.getChildren().setAll(screen);
         scaleContent();
@@ -149,8 +163,13 @@ public class ScreenController {
     }
 
     private void scaleContent() {
-        double scale = Math.min(viewport.getWidth() / 800.0, viewport.getHeight() / 720.0);
+        double scale = Math.min(viewport.getWidth() / contentWidth, viewport.getHeight() / contentHeight);
         if (scale > 0) { scaledContent.setScaleX(scale); scaledContent.setScaleY(scale); }
+    }
+
+    private void closeBattle() {
+        if (activeScreen instanceof LocalBattleView battle) battle.close();
+        if (activeScreen instanceof NetworkBattleView battle) battle.close();
     }
 
     private void applyScreenSize() {

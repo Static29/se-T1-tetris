@@ -96,7 +96,7 @@ class GameplayPreferencesViewTest {
     void settingsScreenCyclesAllWindowModesWithoutSavingDraft() {
         AtomicReference<GameSettings> saved = new AtomicReference<>();
         var view = new SettingsView(GameSettings.DEFAULT, "", saved::set, () -> { });
-        for (int i = 0; i < 3; i++) press(view, KeyCode.DOWN);
+        press(view, KeyCode.DOWN);
         press(view, KeyCode.RIGHT);
         assertTrue(text(view).contains("작은 화면"));
         press(view, KeyCode.RIGHT);

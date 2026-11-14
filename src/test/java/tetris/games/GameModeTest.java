@@ -61,20 +61,21 @@ class GameModeTest {
     }
 
     @Test
-    void settingsSelectItemAndMainMenuShowsIt() {
+    void settingsRetainDefaultModeWhileMainMenuOnlyShowsEntryPoints() {
         var saved = new java.util.concurrent.atomic.AtomicReference<GameSettings>();
-        var view = new SettingsView(GameSettings.DEFAULT, "", saved::set, () -> { });
-        press(view, KeyCode.DOWN);
-        press(view, KeyCode.DOWN);
+        var view = new SettingsView(new GameSettings(Difficulty.HARD, false, GameMode.ITEM), "", saved::set, () -> { });
+        assertFalse(text(view).contains("난이도"));
+        assertFalse(text(view).contains("게임 모드"));
         press(view, KeyCode.RIGHT);
         press(view, KeyCode.DOWN);
         press(view, KeyCode.DOWN);
         press(view, KeyCode.DOWN);
         press(view, KeyCode.ENTER);
         assertEquals(GameMode.ITEM, saved.get().mode());
+        assertEquals(Difficulty.HARD, saved.get().difficulty());
         var menu = new MainMenuView(() -> { }, () -> { }, () -> { }, () -> { });
-        menu.setMode(saved.get().mode());
-        assertTrue(text(menu).contains("게임 모드: Item"));
+        assertTrue(text(menu).contains("일반 게임"));
+        assertFalse(text(menu).contains("게임 모드:"));
     }
 
     @Test

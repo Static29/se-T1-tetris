@@ -24,12 +24,12 @@ class TextViewsTest {
         GameView view = new GameView(game, () -> { }, () -> { });
         assertTrue(allText(view).contains("NEXT"));
         assertTrue(allText(view).contains(PiecePreviewView.format(TetrominoType.T)));
-        press(view, KeyCode.C);
+        press(view, KeyCode.G);
         assertEquals(TetrominoType.I, game.getHeldType());
         assertTrue(allText(view).contains(PiecePreviewView.format(TetrominoType.I)));
         assertTrue(allText(view).contains(PiecePreviewView.format(TetrominoType.O)));
         assertTrue(allText(view).contains("고정 후 사용 가능"));
-        press(view, KeyCode.C);
+        press(view, KeyCode.G);
         assertEquals(TetrominoType.T, game.getCurrentType());
         assertEquals(TetrominoType.I, game.getHeldType());
     }
