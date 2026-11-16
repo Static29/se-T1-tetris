@@ -1,0 +1,8 @@
+.network-play { -fx-background-color: #101010; -fx-font-size: 17px; -fx-font-family: "Malgun Gothic"; }
+.network-play .label { -fx-text-fill: #f0f0f0; }
+.network-play .text-field { -fx-control-inner-background: #181818; -fx-background-color: #181818; -fx-text-fill: white; -fx-prompt-text-fill: #a0a0a0; -fx-border-color: #666; -fx-padding: 10; -fx-highlight-fill: #555; }
+.network-play .button, .network-play .combo-box { -fx-background-color: #252525; -fx-text-fill: white; -fx-border-color: #777; -fx-padding: 9 16; }
+.network-play .button:hover, .network-play .button:focused, .network-play .text-field:focused { -fx-border-color: white; }
+.network-play .list-cell { -fx-background-color: #202020; -fx-text-fill: white; }
+.network-play .list-cell:hover, .network-play .list-cell:selected { -fx-background-color: #444; }
+.network-play .result-card { -fx-background-color: #191919; -fx-border-color: white; -fx-padding: 28; }
