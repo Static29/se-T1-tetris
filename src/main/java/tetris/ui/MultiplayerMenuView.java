@@ -13,8 +13,8 @@ final class MultiplayerMenuView extends VBox {
         Runnable[] actions = {local, network, back};
         setOnKeyPressed(e -> {
             switch (e.getCode()) {
-                case UP -> selected = Math.floorMod(selected - 1, 3);
-                case DOWN -> selected = (selected + 1) % 3;
+                case UP -> selected = Math.floorMod(selected - 1, actions.length);
+                case DOWN -> selected = (selected + 1) % actions.length;
                 case ENTER -> actions[selected].run();
                 case ESCAPE -> back.run();
                 default -> { return; }
