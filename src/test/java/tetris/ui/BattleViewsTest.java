@@ -21,6 +21,92 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @Timeout(20)
 class BattleViewsTest {
+    @Test @Timeout(60) void authenticatedRoomUiRegistersLogsInPlaysAndReturns() throws Exception {
+        Path store = temporary.resolve("server.p12"), certificate = temporary.resolve("server.cer");
+        String keytool = Path.of(System.getProperty("java.home"), "bin", "keytool.exe").toString();
+        runKeytool(keytool, "-genkeypair", "-alias", "server", "-keyalg", "RSA", "-keysize", "2048", "-validity", "2",
+                "-dname", "CN=localhost", "-ext", "SAN=DNS:localhost,IP:127.0.0.1", "-keystore", store.toString(), "-storetype", "PKCS12", "-storepass", "test-password");
+        runKeytool(keytool, "-exportcert", "-alias", "server", "-keystore", store.toString(), "-storepass", "test-password", "-file", certificate.toString());
+        var keys = java.security.KeyStore.getInstance("PKCS12");
+        try (var input = Files.newInputStream(store)) { keys.load(input, "test-password".toCharArray()); }
+        var managers = javax.net.ssl.KeyManagerFactory.getInstance(javax.net.ssl.KeyManagerFactory.getDefaultAlgorithm());
+        managers.init(keys, "test-password".toCharArray());
+        var tls = javax.net.ssl.SSLContext.getInstance("TLS"); tls.init(managers.getKeyManagers(), null, null);
+        var first = new AtomicReference<NetworkPlayView>(); var second = new AtomicReference<NetworkPlayView>();
+        try (var server = tetris.network.DedicatedServer.authenticated(java.net.InetAddress.getLoopbackAddress(), 0,
+                tetris.network.ConnectionOptions.DEFAULT, tls, temporary.resolve("accounts.properties"))) {
+            for (int i = 0; i < 2; i++) {
+                int index = i; var reference = i == 0 ? first : second;
+                var client = tetris.network.NetworkClient.connectTls("localhost", server.port(), tetris.network.ConnectionOptions.DEFAULT,
+                        tetris.network.ServerCertificateTrust.fromFile(certificate));
+                fx(() -> {
+                    var view = new NetworkPlayView(GameSettings.DEFAULT, () -> {}); reference.set(view);
+                    new Scene(view, 1100, 950); view.connected(client);
+                });
+                awaitFx(() -> labels(reference.get()).contains("보안 연결 완료"));
+                fx(() -> {
+                    var view = reference.get(); button(view, "회원가입").fire();
+                    input(view, "ID").setText("tester" + index); input(view, "닉네임").setText("플레이어" + index);
+                    input(view, "비밀번호").setText("test-pass-123");
+                    snapshot(view, 1100, 950, "network-signup"); button(view, "계정 생성").fire();
+                });
+                awaitFx(() -> labels(reference.get()).contains("계정 생성 완료"));
+                Thread.sleep(1100); // 서버 계정 요청 간격 계약(1초).
+                fx(() -> { input(reference.get(), "비밀번호").setText("test-pass-123"); button(reference.get(), "로그인").fire(); });
+                awaitFx(() -> labels(reference.get()).contains("네트워크 로비"));
+            }
+            fx(() -> { snapshot(first.get(), 1100, 950, "network-lobby"); button(first.get(), "방 만들기").fire(); });
+            awaitFx(() -> labels(first.get()).contains("방 번호 1"));
+            fx(() -> { input(second.get(), "참가할 방 번호").setText("1"); button(second.get(), "참가").fire(); });
+            awaitFx(() -> labels(first.get()).contains("플레이어1") && labels(second.get()).contains("플레이어0"));
+            fx(() -> {
+                snapshot(first.get(), 1100, 950, "network-room");
+                button(first.get(), "준비 / 준비 취소").fire(); button(second.get(), "준비 / 준비 취소").fire();
+            });
+            awaitFx(() -> labels(first.get()).contains("플레이 중") && labels(second.get()).contains("플레이 중"));
+            fx(() -> {
+                press(first.get(), KeyCode.S); snapshot(first.get(), 1100, 950, "authenticated-playing");
+                button(second.get(), "대전 포기하고 방 나가기").fire(); button(second.get(), "나가기").fire();
+            });
+            awaitFx(() -> labels(first.get()).contains("플레이어0 승리"));
+            fx(() -> { snapshot(first.get(), 1100, 950, "network-result"); button(first.get(), "확인 · 방으로 돌아가기").fire(); });
+            awaitFx(() -> labels(first.get()).contains("1승") && labels(second.get()).contains("네트워크 로비"));
+        } finally {
+            fx(() -> { if (first.get() != null) first.get().close(); if (second.get() != null) second.get().close(); });
+        }
+    }
+    private static TextField input(Node node, String prompt) {
+        return nodes(node, TextField.class).stream().filter(f -> prompt.equals(f.getPromptText())).findFirst().orElseThrow();
+    }
+    private static String labels(Node node) {
+        return nodes(node, Label.class).stream().map(Label::getText).collect(java.util.stream.Collectors.joining("\n"));
+    }
+    private static void runKeytool(String... command) throws Exception {
+        var process = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
+        assertTrue(process.waitFor(20, TimeUnit.SECONDS)); assertEquals(0, process.exitValue());
+    }
+    @Test void aiChoiceIsExplicitlyPendingAndConnectionUsesKeyboardFields() throws Exception {
+        fx(() -> {
+            var started = new AtomicReference<BattleMatch>();
+            var setup = new BattleSetupView(GameSettings.DEFAULT, started::set, () -> {});
+            assertTrue(nodes(setup, Button.class).isEmpty());
+            var rules = nodes(setup, BattleRulesView.class).getFirst();
+            press(rules, KeyCode.DOWN); press(rules, KeyCode.DOWN); press(rules, KeyCode.DOWN); press(rules, KeyCode.RIGHT);
+            assertTrue(text(setup).contains("상대: < AI"));
+            press(rules, KeyCode.DOWN); press(rules, KeyCode.ENTER);
+            assertNull(started.get());
+            snapshot(setup, 800, 720, "local-ai-pending");
+            press(rules, KeyCode.UP); press(rules, KeyCode.LEFT);
+            assertTrue(text(setup).contains("상대: < 사람"));
+            press(rules, KeyCode.DOWN); press(rules, KeyCode.ENTER); assertNotNull(started.get());
+            var network = new NetworkPlayView(GameSettings.DEFAULT, () -> {});
+            var fields = nodes(network, TextField.class);
+            fields.stream().filter(f -> f.getPromptText().equals("포트")).findFirst().orElseThrow().setText("bad");
+            nodes(network, Button.class).stream().filter(b -> b.getText().equals("보안 연결")).findFirst().orElseThrow().fire();
+            assertTrue(nodes(network, Label.class).stream().anyMatch(l -> l.getText().contains("65535")));
+            snapshot(network, 1100, 950, "network-connect"); network.close();
+        });
+    }
     @TempDir Path temporary;
     @BeforeAll static void startFx() throws Exception {
         var ready = new CountDownLatch(1);
@@ -59,18 +145,18 @@ class BattleViewsTest {
             press(view, KeyCode.DOWN); press(view, KeyCode.RIGHT);
             assertTrue(nodes(view, ComboBox.class).isEmpty());
             assertTrue(nodes(view, Spinner.class).isEmpty());
-            press(view, KeyCode.DOWN); press(view, KeyCode.DOWN); press(view, KeyCode.ENTER);
+            press(view, KeyCode.DOWN); press(view, KeyCode.DOWN); press(view, KeyCode.DOWN); press(view, KeyCode.ENTER);
             assertEquals(2, started.get().games().size());
             assertEquals(GameMode.ITEM, started.get().games().get(0).getSettings().mode());
             assertTrue(started.get().games().stream().allMatch(g -> g.getDifficulty() == Difficulty.HARD));
-            press(view, KeyCode.UP); press(view, KeyCode.UP); press(view, KeyCode.RIGHT);
+            press(view, KeyCode.UP); press(view, KeyCode.UP); press(view, KeyCode.UP); press(view, KeyCode.RIGHT);
             press(view, KeyCode.DOWN);
             for (int i = 0; i < 6; i++) press(view, KeyCode.LEFT);
             assertTrue(text(view).contains("< 1초 >"));
             press(view, KeyCode.RIGHT); assertTrue(text(view).contains("< 30초 >"));
             press(view, KeyCode.RIGHT); assertTrue(text(view).contains("< 60초 >"));
             press(view, KeyCode.LEFT); press(view, KeyCode.LEFT);
-            press(view, KeyCode.DOWN); press(view, KeyCode.ENTER);
+            press(view, KeyCode.DOWN); press(view, KeyCode.DOWN); press(view, KeyCode.ENTER);
             assertEquals(1000, started.get().remainingMillis());
             assertEquals(BattleMode.TIMED, started.get().mode());
             snapshot(view, 800, 720, "local-setup");

@@ -95,7 +95,7 @@ public class ScreenController {
         showScreen(new MultiplayerMenuView(
                 () -> showScreen(new BattleSetupView(settings,
                         match -> showScreen(new LocalBattleView(match, match.games().get(0).getSettings(), this::showMultiplayerMenu)), this::showMultiplayerMenu)),
-                () -> showScreen(new NetworkAccountView(this::showMultiplayerMenu)), this::showMainMenu));
+                () -> showScreen(new NetworkPlayView(settings, this::showMultiplayerMenu)), this::showMainMenu));
     }
 
     private void startGame(GameSettings selected) {
@@ -146,8 +146,8 @@ public class ScreenController {
         if (screen instanceof GameView game) game.applyPreferences(settings);
         activeScreen = screen;
         contentWidth = screen instanceof LocalBattleView battle ? battle.contentWidth()
-                : screen instanceof NetworkBattleView ? 1100 : 800;
-        contentHeight = screen instanceof NetworkBattleView ? 950 : screen instanceof LocalBattleView ? 850 : 720;
+                : screen instanceof NetworkBattleView || screen instanceof NetworkPlayView ? 1100 : 800;
+        contentHeight = screen instanceof NetworkBattleView || screen instanceof NetworkPlayView ? 950 : screen instanceof LocalBattleView ? 850 : 720;
         if (screen instanceof Region region) {
             region.setMinSize(contentWidth, contentHeight);
             region.setPrefSize(contentWidth, contentHeight);
@@ -171,6 +171,7 @@ public class ScreenController {
         if (activeScreen instanceof LocalBattleView battle) battle.close();
         if (activeScreen instanceof NetworkBattleView battle) battle.close();
         if (activeScreen instanceof NetworkAccountView accounts) accounts.close();
+        if (activeScreen instanceof NetworkPlayView network) network.close();
     }
 
     private void applyScreenSize() {

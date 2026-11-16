@@ -9,7 +9,8 @@ import tetris.board.*;
 public record BattleFrame(String name, GameBoardSnapshot board, long score, GameState state,
                           List<GarbageRow> pending, String next, String hold) {
     public BattleFrame {
-        if (!BattleMatch.PROFILES.contains(name)) throw new IllegalArgumentException("알 수 없는 프로필");
+        if (name == null || name.isBlank() || name.length() > 32 || name.chars().anyMatch(Character::isISOControl))
+            throw new IllegalArgumentException("잘못된 플레이어 이름");
         Objects.requireNonNull(board); Objects.requireNonNull(state);
         pending = List.copyOf(pending);
         if (score < 0 || pending.size() > 10 || next.length() != 16 || hold.length() != 16)
