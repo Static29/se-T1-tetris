@@ -89,6 +89,7 @@ class BattleViewsTest {
             var multi = new MultiplayerMenuView(() -> selected.set(5), () -> selected.set(6), () -> selected.set(7));
             press(multi, KeyCode.ENTER); assertEquals(5, selected.get());
             press(multi, KeyCode.DOWN); press(multi, KeyCode.ENTER); assertEquals(6, selected.get());
+            press(multi, KeyCode.DOWN); press(multi, KeyCode.ENTER); assertEquals(7, selected.get());
             press(multi, KeyCode.ESCAPE); assertEquals(7, selected.get());
             snapshot(multi, 800, 720, "multiplayer-menu");
             var chosen = new AtomicReference<GameSettings>();

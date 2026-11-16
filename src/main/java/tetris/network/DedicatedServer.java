@@ -2,13 +2,18 @@ package tetris.network;
 
 import java.io.IOException;
 import java.net.*;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLServerSocket;
 
 /** 단일 1대1 세션 서버. 방/매칭/채팅/다인전 기능은 포함하지 않는다. */
 public final class DedicatedServer implements AutoCloseable {
     private final ServerSocket listener;
     private final ConnectionOptions options;
+    private final BattleRooms rooms;
+    private final AccountSessions accounts;
     private final Map<String, Player> players = new LinkedHashMap<>();
     private final AtomicBoolean closed = new AtomicBoolean();
     private String hostId;
@@ -19,10 +24,31 @@ public final class DedicatedServer implements AutoCloseable {
     private long nextMatch = 1;
 
     public DedicatedServer(InetAddress address, int port, ConnectionOptions options) throws IOException {
+        this(address, port, options, false);
+    }
+
+    /** Room protocol is opt-in so existing 1v1 screens keep their wire contract. */
+    public DedicatedServer(InetAddress address, int port, ConnectionOptions options, boolean roomMode) throws IOException {
+        this(address, port, options, roomMode, null, null);
+    }
+
+    public static DedicatedServer authenticated(InetAddress address, int port, ConnectionOptions options,
+                                                 SSLContext tls, Path accountFile) throws IOException {
+        return new DedicatedServer(address, port, options, true,
+                Objects.requireNonNull(tls), new AccountStore(accountFile));
+    }
+
+    private DedicatedServer(InetAddress address, int port, ConnectionOptions options, boolean roomMode,
+                            SSLContext tls, AccountStore accountStore) throws IOException {
         this.options = Objects.requireNonNull(options);
-        listener = new ServerSocket();
+        listener = tls == null ? new ServerSocket() : tls.getServerSocketFactory().createServerSocket();
+        if (listener instanceof SSLServerSocket secured) {
+            secured.setEnabledProtocols(new String[]{"TLSv1.3", "TLSv1.2"});
+        }
         try { listener.bind(new InetSocketAddress(address, port)); }
         catch (IOException e) { listener.close(); throw e; }
+        rooms = roomMode ? new BattleRooms() : null;
+        accounts = accountStore == null ? null : new AccountSessions(accountStore, rooms);
         Thread.ofVirtual().name("tetris-accept").start(this::acceptLoop);
     }
     public int port() { return listener.getLocalPort(); }
@@ -32,12 +58,24 @@ public final class DedicatedServer implements AutoCloseable {
             try {
                 socket = listener.accept();
                 synchronized (this) {
-                    if (closed.get() || players.size() == 2) { socket.close(); continue; }
+                    if (closed.get() || players.size() >= (rooms == null ? 2 : 32)) { socket.close(); continue; }
                     String id = "p" + nextPlayer++;
                     Player player = new Player(id);
                     player.connection = new PeerConnection(socket, options,
-                            message -> receive(id, message), reason -> disconnected(id));
+                            message -> {
+                                if (accounts == null) receive(id, message);
+                                else accounts.receive(id, message);
+                            }, reason -> {
+                                if (rooms == null) disconnected(id);
+                                else Thread.startVirtualThread(() -> disconnected(id));
+                            });
                     players.put(id, player);
+                    if (rooms != null) {
+                        if (accounts == null) rooms.connect(id, player.connection::send);
+                        else accounts.connect(id, player.connection::send);
+                        player.connection.start();
+                        continue;
+                    }
                     if (hostId == null) hostId = id;
                     player.connection.start();
                     send(player, "WELCOME", id, hostId);
@@ -53,6 +91,7 @@ public final class DedicatedServer implements AutoCloseable {
     private synchronized void receive(String id, NetworkMessage message) {
         Player player = players.get(id);
         if (player == null) return;
+        if (rooms != null) { rooms.receive(id, message); return; }
         var f = message.fields();
         try {
             switch (message.type()) {
@@ -133,6 +172,13 @@ public final class DedicatedServer implements AutoCloseable {
 
     /** 한쪽 연결이 끊기면 세션 종료. 양쪽 UI는 접속 초기 화면으로 돌아가야 한다. */
     private synchronized void disconnected(String id) {
+        if (rooms != null) {
+            if (players.remove(id) != null) {
+                if (accounts == null) rooms.disconnect(id);
+                else accounts.disconnect(id);
+            }
+            return;
+        }
         if (!players.containsKey(id)) return;
         var previous = List.copyOf(players.values());
         players.clear(); hostId = null; matchId = ""; mode = "NORMAL"; durationSeconds = 0;
@@ -141,6 +187,13 @@ public final class DedicatedServer implements AutoCloseable {
     @Override public synchronized void close() {
         if (!closed.compareAndSet(false, true)) return;
         try { listener.close(); } catch (IOException ignored) { }
+        if (rooms != null) {
+            if (accounts != null) List.copyOf(players.keySet()).forEach(accounts::disconnect);
+            rooms.close();
+            players.values().forEach(p -> p.connection.close());
+            players.clear();
+            return;
+        }
         if (!players.isEmpty()) disconnected(players.keySet().iterator().next());
     }
     private static final class Player {

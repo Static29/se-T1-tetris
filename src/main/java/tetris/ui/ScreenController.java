@@ -95,7 +95,7 @@ public class ScreenController {
         showScreen(new MultiplayerMenuView(
                 () -> showScreen(new BattleSetupView(settings,
                         match -> showScreen(new LocalBattleView(match, match.games().get(0).getSettings(), this::showMultiplayerMenu)), this::showMultiplayerMenu)),
-                () -> showScreen(new NetworkBattleView(settings, this::showMultiplayerMenu)), this::showMainMenu));
+                () -> showScreen(new NetworkAccountView(this::showMultiplayerMenu)), this::showMainMenu));
     }
 
     private void startGame(GameSettings selected) {
@@ -170,6 +170,7 @@ public class ScreenController {
     private void closeBattle() {
         if (activeScreen instanceof LocalBattleView battle) battle.close();
         if (activeScreen instanceof NetworkBattleView battle) battle.close();
+        if (activeScreen instanceof NetworkAccountView accounts) accounts.close();
     }
 
     private void applyScreenSize() {
