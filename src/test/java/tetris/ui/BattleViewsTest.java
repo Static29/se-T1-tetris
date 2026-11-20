@@ -130,8 +130,8 @@ class BattleViewsTest {
                             var glyph = (javafx.scene.text.Text) row.getChildren().get(cell[0] + 1);
                             assertEquals(item.getSymbol() + " ", glyph.getText());
                             assertEquals(javafx.scene.paint.Color.WHITE, glyph.getFill());
-                            assertTrue(glyph.isUnderline());
-                            assertEquals(1, nodes(rendered, javafx.scene.text.Text.class).stream().filter(javafx.scene.text.Text::isUnderline).count());
+                            assertFalse(glyph.isUnderline());
+                            assertEquals(0, nodes(rendered, javafx.scene.text.Text.class).stream().filter(javafx.scene.text.Text::isUnderline).count());
                         }
                         if (item == tetris.block.ItemType.BOMB && !colorBlind) snapshot(view, 880, 850, "local-falling-item");
                     } finally { view.close(); }
