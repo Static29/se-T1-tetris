@@ -47,8 +47,11 @@ public final class ColoredBoardView extends VBox {
             Cell cell = snapshot[row][col];
             boolean silhouette = cell.isEmpty() && ghostPositions.contains(new Position(row, col));
             char symbol = symbols == null ? (cell.isEmpty() ? '.' : 'O') : symbols[row][col];
+            boolean item = !cell.isEmpty() && "LFBM".indexOf(symbol) >= 0;
             cells[row][col].setText((silhouette ? 'O' : symbol) + " ");
+            cells[row][col].setUnderline(item);
             Color color = silhouette ? Color.GRAY : cell.isEmpty() ? Color.DIMGRAY
+                    : item ? Color.WHITE
                     : cell == Cell.WEIGHT ? Color.WHITESMOKE
                     : cell == Cell.GARBAGE ? Color.GRAY
                     : Color.web(TetrominoType.valueOf(cell.name()).getColorHex(colorBlindMode));
