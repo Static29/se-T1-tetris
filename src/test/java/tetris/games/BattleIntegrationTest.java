@@ -72,6 +72,19 @@ class BattleIntegrationTest {
         assertEquals(List.of(GarbageRow.withHoles(10, List.of(4, 5)), GarbageRow.withHoles(10, List.of(4, 5))), sent);
         assertEquals(4000 + distance * 10L, game.getScore());
     }
+    @Test void displayedLinesIncludeReceivedRowsButAttackDoesNot() {
+        Board board = new Board();
+        for (int c = 0; c < 10; c++) {
+            if (c != 4 && c != 5) {
+                board.lock(List.of(new Position(20, c)), Cell.J);
+                board.lock(List.of(new Position(21, c)), Cell.GARBAGE);
+            }
+        }
+        Game game = new Game(() -> TetrominoType.O, board);
+        var sent = new ArrayList<GarbageRow>(); game.setAttackListener(sent::addAll); game.start(); game.hardDrop();
+        assertEquals(2, game.getClearedLines(), "화면 삭제 줄은 받은 줄 포함");
+        assertTrue(sent.isEmpty(), "내 줄 1줄이라 공격 없음");
+    }
     @Test void timedWinnerUsesScoresAndStopsAllGames() {
         var match = new BattleMatch(2, BattleMode.TIMED, 1, GameSettings.DEFAULT);
         match.act(0, GameAction.SOFT_DROP); match.advanceTime(2000);
