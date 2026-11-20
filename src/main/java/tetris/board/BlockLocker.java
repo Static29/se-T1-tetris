@@ -14,7 +14,8 @@ import tetris.block.ItemType;
  *
  * <p>대전 모드 공격(Req3): 이 블록으로 지운 줄(L 줄 + 꽉 찬 줄)이 MIN_ATTACK_ROWS줄 이상이면 그 줄들을 공격 줄로 돌려준다.
  * 방금 놓은 블록 칸과 F가 채운 칸은 비워서 보내고, L 줄은 그 밖의 칸을 모두 채워 보낸다.
- * B·무게추로 고정한 경우는 줄을 지워도 보내지 않는다(팀 결정).
+ * B·무게추로 고정한 경우는 줄을 지워도 보내지 않는다. 상대에게 받은 줄은 지워도 다시 보내지 않고 줄 수에도 세지 않는다(팀 결정).
+ * 받은 줄은 점수(줄·칸 점수, M 배율)와 속도에서도 빠지고, LockResult.receivedRowsCleared로 아이템 카운트에만 쓰인다.
  *
  * <p>아이템별 효과는 ItemEffect 구현 클래스가 맡고, 이 클래스는 순서와 결과 합치기만 한다.
  * <ul>
@@ -69,19 +70,33 @@ public final class BlockLocker {
         AttackRowBuilder attack = new AttackRowBuilder(board, positions);
         ItemEffect.Outcome item = applyItem(board, block, cell, effects);
         attack.addHoles(item.filledCells());
+        // L이 지운 줄이 받은 줄이면 그 줄의 줄 수·칸 점수·배율을 모두 빼고 받은 줄 수로만 센다.
+        boolean itemRowReceived = item.clearedRows().stream().anyMatch(attack::isReceived);
         item.clearedRows().forEach(attack::rowCleared);
-        boolean multiplierApplied = item.multiplierApplied();
+        int receivedRowsCleared = itemRowReceived ? item.rowsCleared() : 0;
+        int itemRowsCleared = itemRowReceived ? 0 : item.rowsCleared();
+        int itemCellsRemoved = itemRowReceived ? 0 : item.cellsRemoved();
+        boolean multiplierApplied = !itemRowReceived && item.multiplierApplied();
+
         List<Integer> fullRows = board.findFullRows();
         if (!fullRows.isEmpty()) {
-            multiplierApplied |= fullRows.stream().anyMatch(board::hasMultiplierInRow);
             effects.accept(new LineClearEffect(board.getVisibleCells(), fullRows));
         }
+        int ownFullRows = 0;
+        for (int row : fullRows) {
+            if (attack.isReceived(row)) {
+                receivedRowsCleared++;
+            } else {
+                ownFullRows++;
+                multiplierApplied |= board.hasMultiplierInRow(row);
+            }
+        }
         attack.fullRowsCleared(fullRows);
-        int fullRowsCleared = board.clearFullRows().size();
+        board.clearFullRows();
         List<GarbageRow> attackRows = canAttack(block) && attack.size() >= MIN_ATTACK_ROWS
                 ? attack.rows() : List.of();
-        return new LockResult(false, fullRowsCleared, item.rowsCleared(), item.cellsRemoved(),
-                multiplierApplied, attackRows);
+        return new LockResult(false, ownFullRows, itemRowsCleared, itemCellsRemoved,
+                multiplierApplied, receivedRowsCleared, attackRows);
     }
 
     /** 이 블록으로 지운 줄을 상대에게 보낼 수 있는지. 아이템이 없는 블록은 보낸다. B·무게추는 보내지 않는다(팀 결정). */
