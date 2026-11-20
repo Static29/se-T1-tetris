@@ -48,7 +48,11 @@ public final class LocalBattleView extends VBox implements AutoCloseable {
     private void refresh(boolean colorBlind) {
         status.setText(match.finished() ? match.result() + " · Esc: 돌아가기"
                 : match.mode() + (match.mode() == BattleMode.TIMED ? " · 남은 시간 " + (match.remainingMillis() + 999) / 1000 + "초" : ""));
-        for (int i = 0; i < boards.size(); i++) boards.get(i).render(BattleFrame.of(match.games().get(i), BattleMatch.PROFILES.get(i)), colorBlind);
+        for (int i = 0; i < boards.size(); i++) {
+            var game = match.games().get(i);
+            boards.get(i).render(BattleFrame.of(game, BattleMatch.PROFILES.get(i)), colorBlind);
+            boards.get(i).renderProgress(game);
+        }
     }
     public double contentWidth() { return 440 * boards.size(); }
     @Override public void close() { timer.stop(); }

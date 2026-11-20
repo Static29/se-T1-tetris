@@ -108,6 +108,62 @@ class BattleViewsTest {
         });
     }
     @TempDir Path temporary;
+    @Test void fallingItemsRemainVisibleAtTheirActualCellAfterMovingAndRotating() throws Exception {
+        fx(() -> {
+            for (boolean colorBlind : new boolean[]{false, true}) {
+                for (var item : List.of(tetris.block.ItemType.LINE_CLEAR, tetris.block.ItemType.FILL,
+                        tetris.block.ItemType.BOMB, tetris.block.ItemType.MULTIPLIER)) {
+                    var settings = new GameSettings(Difficulty.NORMAL, colorBlind, GameMode.ITEM);
+                    var board = new tetris.board.Board();
+                    var factory = new tetris.block.ItemBlockFactory(new Random(1));
+                    var game = new Game(board, () -> factory.create(true, tetris.block.TetrominoType.T, item, 0, 0),
+                            settings, new tetris.score.DeletionScorePolicy());
+                    var match = new BattleMatch(List.of(game, new Game(settings)), BattleMode.ITEM, 180, new Random(1));
+                    var view = new LocalBattleView(match, settings, () -> {});
+                    try {
+                        for (int step = 0; step < 4; step++) game.softDrop();
+                        for (int rotation = 0; rotation < 4; rotation++) {
+                            game.rotateClockwise(); game.softDrop(); press(view, KeyCode.TAB);
+                            var cell = game.getCurrentBlock().getBoardItemCells()[0];
+                            var rendered = nodes(view, ColoredBoardView.class).getFirst();
+                            var row = (HBox) rendered.getChildren().get(cell[1] - board.getBufferRows() + 1);
+                            var glyph = (javafx.scene.text.Text) row.getChildren().get(cell[0] + 1);
+                            assertEquals(item.getSymbol() + " ", glyph.getText());
+                            assertEquals(javafx.scene.paint.Color.WHITE, glyph.getFill());
+                            assertTrue(glyph.isUnderline());
+                            assertEquals(1, nodes(rendered, javafx.scene.text.Text.class).stream().filter(javafx.scene.text.Text::isUnderline).count());
+                        }
+                        if (item == tetris.block.ItemType.BOMB && !colorBlind) snapshot(view, 880, 850, "local-falling-item");
+                    } finally { view.close(); }
+                }
+            }
+        });
+    }
+    @Test void localItemCountdownUpdatesPerPlayerAndReportsReadyNext() throws Exception {
+        fx(() -> {
+            var settings = new GameSettings(Difficulty.NORMAL, false, GameMode.ITEM);
+            var board = new tetris.board.Board();
+            var game = new Game(board, () -> new tetris.block.Block(tetris.block.TetrominoType.I), settings,
+                    new tetris.score.DeletionScorePolicy(), new Random(42));
+            var match = new BattleMatch(List.of(game, new Game(settings)), BattleMode.ITEM, 180, new Random(1));
+            var view = new LocalBattleView(match, settings, () -> {});
+            try {
+                var panes = nodes(view, BattleBoardPane.class);
+                assertTrue(text(panes.getFirst()).contains("아이템까지 10줄"));
+                for (int line = 1; line <= 10; line++) {
+                    for (int column = 0; column < 10; column++) if (column < 3 || column > 6)
+                        board.lock(List.of(new tetris.board.Position(21, column)), tetris.board.Cell.J);
+                    game.hardDrop(); game.advanceTime(Game.LINE_CLEAR_MILLIS); press(view, KeyCode.TAB);
+                    assertTrue(text(panes.getFirst()).contains("삭제 " + line + "줄"));
+                    assertTrue(text(panes.getFirst()).contains("아이템까지 " + game.getLinesUntilItem() + "줄"));
+                    assertTrue(text(panes.get(1)).contains("삭제 0줄"));
+                }
+                assertTrue(text(panes.getFirst()).contains("NEXT 아이템 준비"));
+                snapshot(view, 880, 850, "local-item-countdown");
+            } finally { view.close(); }
+        });
+    }
+
     @BeforeAll static void startFx() throws Exception {
         var ready = new CountDownLatch(1);
         try { Platform.startup(() -> { Platform.setImplicitExit(false); ready.countDown(); }); }

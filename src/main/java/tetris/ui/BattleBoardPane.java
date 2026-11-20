@@ -11,15 +11,26 @@ final class BattleBoardPane extends VBox {
     private final Text heading = text("연결 대기", 19);
     private final String label;
     private final ColoredBoardView board = new ColoredBoardView();
+    private final Text progress = text("", 12);
     private final Text next = text("", 14), hold = text("", 14), pendingTitle = text("받을 공격 0/10", 12), pending = text("", 12);
     BattleBoardPane() {
         this(null);
     }
     BattleBoardPane(String label) {
         super(10); this.label = label; setAlignment(Pos.TOP_CENTER);
-        VBox side = new VBox(6, next, hold, pendingTitle, pending);
+        progress.setVisible(false); progress.setManaged(false);
+        VBox side = new VBox(6, next, hold, progress, pendingTitle, pending);
         HBox content = new HBox(10, board, side); content.setAlignment(Pos.TOP_CENTER);
         getChildren().addAll(heading, content);
+    }
+    void renderProgress(Game game) {
+        progress.setVisible(true); progress.setManaged(true);
+        String message = "삭제 " + game.getClearedLines() + "줄";
+        if (game.getSettings().mode() == GameMode.ITEM) {
+            message += "\n아이템까지 " + game.getLinesUntilItem() + "줄";
+            if (game.getNextBlock() != null && game.getNextBlock().hasItem()) message += "\nNEXT 아이템 준비";
+        }
+        progress.setText(message);
     }
     void render(BattleFrame frame, boolean colorBlind) {
         if (frame == null) return;
