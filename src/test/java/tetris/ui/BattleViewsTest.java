@@ -85,20 +85,23 @@ class BattleViewsTest {
         var process = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
         assertTrue(process.waitFor(20, TimeUnit.SECONDS)); assertEquals(0, process.exitValue());
     }
-    @Test void aiChoiceIsExplicitlyPendingAndConnectionUsesKeyboardFields() throws Exception {
+    @Test void aiChoiceStartsSelectedDifficultyAndConnectionUsesKeyboardFields() throws Exception {
         fx(() -> {
             var started = new AtomicReference<BattleMatch>();
-            var setup = new BattleSetupView(GameSettings.DEFAULT, started::set, () -> {});
+            var selectedAi = new AtomicReference<tetris.ai.AiDifficulty>();
+            var setup = new BattleSetupView(GameSettings.DEFAULT, (match, difficulty) -> { started.set(match); selectedAi.set(difficulty); }, () -> {});
             assertTrue(nodes(setup, Button.class).isEmpty());
             var rules = nodes(setup, BattleRulesView.class).getFirst();
             press(rules, KeyCode.DOWN); press(rules, KeyCode.DOWN); press(rules, KeyCode.DOWN); press(rules, KeyCode.RIGHT);
             assertTrue(text(setup).contains("상대: < AI"));
+            press(rules, KeyCode.DOWN); press(rules, KeyCode.RIGHT);
+            assertTrue(text(setup).contains("AI 난이도: < 어려움 >"));
             press(rules, KeyCode.DOWN); press(rules, KeyCode.ENTER);
-            assertNull(started.get());
-            snapshot(setup, 800, 720, "local-ai-pending");
-            press(rules, KeyCode.UP); press(rules, KeyCode.LEFT);
+            assertNotNull(started.get()); assertEquals(tetris.ai.AiDifficulty.HARD, selectedAi.get());
+            snapshot(setup, 800, 720, "local-ai-setup");
+            press(rules, KeyCode.UP); press(rules, KeyCode.UP); press(rules, KeyCode.LEFT);
             assertTrue(text(setup).contains("상대: < 사람"));
-            press(rules, KeyCode.DOWN); press(rules, KeyCode.ENTER); assertNotNull(started.get());
+            press(rules, KeyCode.DOWN); press(rules, KeyCode.ENTER); assertNotNull(started.get()); assertNull(selectedAi.get());
             var network = new NetworkPlayView(GameSettings.DEFAULT, () -> {});
             var fields = nodes(network, TextField.class);
             fields.stream().filter(f -> f.getPromptText().equals("포트")).findFirst().orElseThrow().setText("bad");
@@ -130,8 +133,8 @@ class BattleViewsTest {
                             var glyph = (javafx.scene.text.Text) row.getChildren().get(cell[0] + 1);
                             assertEquals(item.getSymbol() + " ", glyph.getText());
                             assertEquals(javafx.scene.paint.Color.WHITE, glyph.getFill());
-                            assertTrue(glyph.isUnderline());
-                            assertEquals(1, nodes(rendered, javafx.scene.text.Text.class).stream().filter(javafx.scene.text.Text::isUnderline).count());
+                            assertFalse(glyph.isUnderline());
+                            assertEquals(0, nodes(rendered, javafx.scene.text.Text.class).stream().filter(javafx.scene.text.Text::isUnderline).count());
                         }
                         if (item == tetris.block.ItemType.BOMB && !colorBlind) snapshot(view, 880, 850, "local-falling-item");
                     } finally { view.close(); }
@@ -163,7 +166,35 @@ class BattleViewsTest {
             } finally { view.close(); }
         });
     }
-
+    @Test void aiBoardUsesTimerAndRejectsPlayerTwoKeys() throws Exception {
+        fx(() -> {
+            var match = new BattleMatch(2, BattleMode.NORMAL, 180, GameSettings.DEFAULT);
+            var view = new LocalBattleView(match, GameSettings.DEFAULT, tetris.ai.AiDifficulty.HARD, () -> {});
+            try {
+                String before = BattleFrame.of(match.games().get(1), "AI").encode();
+                for (var key : List.of(KeyCode.LEFT, KeyCode.RIGHT, KeyCode.UP, KeyCode.DOWN, KeyCode.NUMPAD1, KeyCode.NUMPAD2)) press(view, key);
+                assertEquals(before, BattleFrame.of(match.games().get(1), "AI").encode());
+                int x = match.games().get(0).getCurrentBlock().getX();
+                press(view, KeyCode.A); assertEquals(x - 1, match.games().get(0).getCurrentBlock().getX());
+                view.advanceTime(199);
+                assertEquals(before, BattleFrame.of(match.games().get(1), "AI").encode());
+                view.advanceTime(1);
+                assertNotEquals(before, BattleFrame.of(match.games().get(1), "AI").encode());
+                snapshot(view, 880, 850, "local-ai-playing");
+                assertTrue(text(view).contains("오른쪽 AI"));
+                view.close();
+                String stopped = BattleFrame.of(match.games().get(1), "AI").encode();
+                view.advanceTime(1000);
+                assertEquals(stopped, BattleFrame.of(match.games().get(1), "AI").encode());
+            } finally { view.close(); }
+            var timed = new BattleMatch(2, BattleMode.TIMED, 1, GameSettings.DEFAULT);
+            var timedView = new LocalBattleView(timed, GameSettings.DEFAULT, tetris.ai.AiDifficulty.NORMAL, () -> {});
+            timedView.advanceTime(1000); assertTrue(timed.finished());
+            String ended = BattleFrame.of(timed.games().get(1), "AI").encode();
+            timedView.advanceTime(1000);
+            assertEquals(ended, BattleFrame.of(timed.games().get(1), "AI").encode()); timedView.close();
+        });
+    }
     @BeforeAll static void startFx() throws Exception {
         var ready = new CountDownLatch(1);
         try { Platform.startup(() -> { Platform.setImplicitExit(false); ready.countDown(); }); }
@@ -196,7 +227,7 @@ class BattleViewsTest {
     @Test void localSetupAlwaysStartsTwoPlayersAndSelectsTimedOrItemRules() throws Exception {
         fx(() -> {
             var started = new AtomicReference<BattleMatch>();
-            var view = new BattleSetupView(GameSettings.DEFAULT, started::set, () -> {});
+            var view = new BattleSetupView(GameSettings.DEFAULT, (match, difficulty) -> started.set(match), () -> {});
             press(view, KeyCode.RIGHT);
             press(view, KeyCode.DOWN); press(view, KeyCode.RIGHT);
             assertTrue(nodes(view, ComboBox.class).isEmpty());

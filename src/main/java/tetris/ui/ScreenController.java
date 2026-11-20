@@ -94,7 +94,7 @@ public class ScreenController {
     private void showMultiplayerMenu() {
         showScreen(new MultiplayerMenuView(
                 () -> showScreen(new BattleSetupView(settings,
-                        match -> showScreen(new LocalBattleView(match, match.games().get(0).getSettings(), this::showMultiplayerMenu)), this::showMultiplayerMenu)),
+                        (match, aiDifficulty) -> showScreen(new LocalBattleView(match, match.games().get(0).getSettings(), aiDifficulty, this::showMultiplayerMenu)), this::showMultiplayerMenu)),
                 () -> showScreen(new NetworkPlayView(settings, this::showMultiplayerMenu)), this::showMainMenu));
     }
 

@@ -3,10 +3,11 @@ package tetris.ui;
 import javafx.geometry.*;
 import javafx.scene.layout.VBox;
 import tetris.games.*;
-import java.util.function.Consumer;
+import java.util.function.BiConsumer;
+import tetris.ai.AiDifficulty;
 
 final class BattleSetupView extends VBox {
-    BattleSetupView(GameSettings settings, Consumer<BattleMatch> start, Runnable back) {
+    BattleSetupView(GameSettings settings, BiConsumer<BattleMatch, AiDifficulty> start, Runnable back) {
         super(24); setAlignment(Pos.CENTER); setPadding(new Insets(24)); setStyle("-fx-background-color: #101010;");
         BattleRulesView rules = new BattleRulesView(settings, true, "대전 시작", () -> startMatch(settings, start), back);
         getChildren().addAll(BattleBoardPane.text("===== 로컬 1:1 대전 =====", 26), rules,
@@ -14,10 +15,10 @@ final class BattleSetupView extends VBox {
         setFocusTraversable(true);
         setOnKeyPressed(e -> { if (!e.isConsumed()) rules.getOnKeyPressed().handle(e); });
     }
-    private void startMatch(GameSettings settings, Consumer<BattleMatch> start) {
+    private void startMatch(GameSettings settings, BiConsumer<BattleMatch, AiDifficulty> start) {
         BattleRulesView rules = (BattleRulesView) getChildren().get(1);
         var selected = new GameSettings(rules.difficulty(), settings.colorBlindMode(), settings.mode(),
                 settings.screenSize(), settings.keyBindings(), settings.playerTwoBindings());
-        start.accept(new BattleMatch(2, rules.mode(), rules.seconds(), selected));
+        start.accept(new BattleMatch(2, rules.mode(), rules.seconds(), selected), rules.aiDifficulty());
     }
 }
