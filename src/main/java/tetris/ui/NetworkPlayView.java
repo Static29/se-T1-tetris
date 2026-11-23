@@ -1,6 +1,5 @@
 package tetris.ui;
 
-import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Properties;
 import javax.net.ssl.SSLContext;
@@ -10,7 +9,6 @@ import javafx.geometry.*;
 import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
-import javafx.stage.FileChooser;
 import tetris.games.*;
 import tetris.network.*;
 
@@ -28,7 +26,6 @@ final class NetworkPlayView extends StackPane implements AutoCloseable {
     private final AnimationTimer timer;
     private NetworkClient client;
     private RoomBattleSession session;
-    private Path certificate;
     private Page page = Page.CONNECT;
     private boolean closed, connecting, authenticated;
     private int generation;
@@ -50,7 +47,13 @@ final class NetworkPlayView extends StackPane implements AutoCloseable {
                 previous = now; tick(delta);
             }
         };
-        sceneProperty().addListener((o, before, after) -> { if (after == null) close(); else timer.start(); });
+        sceneProperty().addListener((o, before, after) -> {
+            if (after == null) close();
+            else {
+                timer.start();
+                Platform.runLater(() -> { if (!closed && client == null) connect(); });
+            }
+        });
         setOnKeyPressed(event -> {
             if (page == Page.GAME && session != null && getChildren().size() == 1 && !(event.getTarget() instanceof Button)) {
                 BattleKeys.action(settings, 0, event.getCode()).ifPresent(session::act);
@@ -80,14 +83,8 @@ final class NetworkPlayView extends StackPane implements AutoCloseable {
         heading.setStyle("-fx-font-size: 28px; -fx-font-weight: bold;"); body.getChildren().add(heading);
         switch (page) {
             case CONNECT -> {
-                var cert = label(certificate == null ? "기본 신뢰 인증서 사용" : certificate.getFileName().toString());
-                body.getChildren().addAll(host, port, cert, row(button("서버 공개 인증서 선택", () -> {
-                    var chooser = new FileChooser(); chooser.setTitle("서버 운영자에게 받은 공개 인증서");
-                    chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("공개 인증서", "*.cer", "*.crt", "*.pem", "*.der"));
-                    var file = chooser.showOpenDialog(getScene().getWindow());
-                    if (file != null) { certificate = file.toPath(); cert.setText(file.getName()); }
-                }), button("기본 인증서", () -> { certificate = null; cert.setText("기본 신뢰 인증서 사용"); })),
-                        button("보안 연결", this::connect), label("서버에서 받은 공개 인증서를 선택하세요.\n공인 인증서 서버는 기본 인증서로 연결할 수 있습니다."),
+                body.getChildren().addAll(label("T1 전용 서버에 자동으로 연결합니다."),
+                        button("다시 연결", this::connect),
                         button("돌아가기", () -> { close(); back.run(); }));
             }
             case LOGIN, REGISTER -> {
@@ -153,11 +150,11 @@ final class NetworkPlayView extends StackPane implements AutoCloseable {
         catch (NumberFormatException e) { status.setText("포트는 1~65535 사이의 숫자입니다."); return; }
         String address = host.getText().strip();
         if (address.isBlank() || address.length() > 253 || address.chars().anyMatch(Character::isWhitespace)) { status.setText("서버 주소를 입력하세요."); return; }
-        int attempt = ++generation; Path selectedCertificate = certificate;
+        int attempt = ++generation;
         connecting = true; status.setText("TLS 보안 연결 중…");
         Thread.ofVirtual().name("network-play-connect").start(() -> {
             try {
-                SSLContext tls = selectedCertificate == null ? SSLContext.getDefault() : ServerCertificateTrust.fromFile(selectedCertificate);
+                SSLContext tls = ServerCertificateTrust.bundled();
                 var connection = NetworkClient.connectTls(address, selectedPort, ConnectionOptions.DEFAULT, tls);
                 Platform.runLater(() -> {
                     if (closed || attempt != generation) { connection.close(); return; }
@@ -165,7 +162,7 @@ final class NetworkPlayView extends StackPane implements AutoCloseable {
                 });
             } catch (Exception e) {
                 Platform.runLater(() -> { if (!closed && attempt == generation) {
-                    connecting = false; status.setText("연결 실패. 서버 주소·포트·공개 인증서 및 인증서에 등록된 주소를 확인하세요.");
+                    connecting = false; status.setText("서버에 연결하지 못했습니다. 네트워크 연결을 확인하고 다시 시도하세요.");
                 }});
             }
         });

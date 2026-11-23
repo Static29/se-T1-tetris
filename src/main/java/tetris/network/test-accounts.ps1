@@ -8,6 +8,9 @@ try {
     $certificate = Join-Path $work 'local-test.cer'
     & keytool -exportcert -alias local-test -keystore $key -storepass localtestonly -file $certificate
     if ($LASTEXITCODE -ne 0) { throw 'Test public certificate export failed.' }
+    $resourceDirectory = Join-Path $work 'tetris'
+    New-Item -ItemType Directory -Path $resourceDirectory | Out-Null
+    Copy-Item -LiteralPath $certificate -Destination (Join-Path $resourceDirectory 'dedicated-server.cer')
     $source = Join-Path $work 'AccountSmoke.java'
     $javaSource = @'
 import java.net.InetAddress;
@@ -33,7 +36,8 @@ public class AccountSmoke {
         var serverTls = SSLContext.getInstance("TLS");
         serverTls.init(keyManager.getKeyManagers(), null, null);
 
-        var clientTls = ServerCertificateTrust.fromFile(Path.of(args[2]));
+        var clientTls = ServerCertificateTrust.bundled();
+        ServerCertificateTrust.fromFile(Path.of(args[2]));
         try {
             ServerCertificateTrust.fromFile(Path.of(args[0]));
             throw new AssertionError("Server key store accepted as a public certificate");
