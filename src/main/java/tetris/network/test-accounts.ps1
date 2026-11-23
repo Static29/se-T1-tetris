@@ -52,8 +52,12 @@ public class AccountSmoke {
         }
 
         try (var server = DedicatedServer.authenticated(loopback, 0, OPTIONS, serverTls, accounts);
-             var client = NetworkClient.connectTls("localhost", server.port(), OPTIONS, clientTls)) {
+             var client = NetworkClient.connectTls("localhost", server.port(), OPTIONS, clientTls);
+             var guest = NetworkClient.connectTls("localhost", server.port(), OPTIONS, clientTls)) {
             expect(client, "AUTH_REQUIRED");
+            expect(guest, "AUTH_REQUIRED");
+            send(guest, "REGISTER", "smoke_guest", "SmokeGuest", OLD_PASSWORD);
+            expect(guest, "REGISTERED");
             send(client, "CREATE_ROOM", "2", "DUEL", "0", "false", "NORMAL");
             expect(client, "ERROR", "LOGIN_REQUIRED");
             send(client, "REGISTER", "smoke_player", "SmokePlayer", "Short7x");
@@ -66,11 +70,22 @@ public class AccountSmoke {
             send(client, "LOGIN", "smoke_player", OLD_PASSWORD);
             loginAccepted(client);
             send(client, "CREATE_ROOM", "2", "DUEL", "0", "false", "NORMAL");
-            expect(client, "ROOM_JOINED");
+            String roomId = expect(client, "ROOM_JOINED").fields().getFirst();
             expect(client, "ROOM_LOBBY");
             expect(client, "PLAYER_NAME");
             expect(client, "READY");
             System.out.println("PASS: login and room creation");
+            send(guest, "LOGIN", "smoke_guest", OLD_PASSWORD);
+            loginAccepted(guest);
+            send(guest, "JOIN_ROOM", roomId);
+            expect(guest, "ROOM_JOINED");
+            send(client, "READY", "true");
+            send(guest, "READY", "true");
+            String matchId = await(client, "ROOM_START").fields().getFirst();
+            if (!await(guest, "ROOM_START").fields().getFirst().equals(matchId)) {
+                throw new AssertionError("Clients received different match IDs");
+            }
+            System.out.println("PASS: room join, readiness and shared match start");
             Thread.sleep(1100);
             send(client, "CHANGE_PASSWORD", OLD_PASSWORD, NEW_PASSWORD);
             expect(client, "PASSWORD_CHANGED");
@@ -102,12 +117,24 @@ public class AccountSmoke {
         if (!client.send(NetworkMessage.of(type, fields))) throw new AssertionError("Send failed: " + type);
     }
 
-    static void expect(NetworkClient client, String type, String... fields) throws Exception {
+    static NetworkMessage await(NetworkClient client, String type) throws Exception {
+        long deadline = System.nanoTime() + Duration.ofSeconds(8).toNanos();
+        while (System.nanoTime() - deadline < 0) {
+            var event = client.poll(Duration.ofMillis(100));
+            if (event == null) continue;
+            if (event.type().equals(type)) return event;
+            if (event.type().equals("ERROR")) throw new AssertionError(event);
+        }
+        throw new AssertionError("Missing " + type);
+    }
+
+    static NetworkMessage expect(NetworkClient client, String type, String... fields) throws Exception {
         var event = client.poll(Duration.ofSeconds(8));
         if (event == null || !event.type().equals(type)
                 || (fields.length > 0 && !event.fields().equals(java.util.List.of(fields)))) {
             throw new AssertionError("Expected " + type + ", received " + event);
         }
+        return event;
     }
 }
 '@
