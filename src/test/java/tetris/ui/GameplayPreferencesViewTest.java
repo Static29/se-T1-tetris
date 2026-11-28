@@ -15,6 +15,49 @@ import tetris.score.LeaderboardEntry;
 import static org.junit.jupiter.api.Assertions.*;
 
 class GameplayPreferencesViewTest {
+    @Test void graphicalPreferenceSavesAndOldFilesDefaultToText(@org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) throws Exception {
+        var store = new tetris.persistence.SettingsStore(directory.resolve("settings.properties"));
+        assertFalse(store.load().graphical());
+        var saved = new AtomicReference<GameSettings>();
+        var settings = new SettingsView(GameSettings.DEFAULT, "", saved::set, () -> {});
+        for (int i = 0; i < 4; i++) press(settings, KeyCode.DOWN);
+        press(settings, KeyCode.RIGHT); press(settings, KeyCode.UP); press(settings, KeyCode.ENTER);
+        assertTrue(saved.get().graphical()); store.save(saved.get()); assertEquals(saved.get(), store.load());
+        assertTrue(BattleMode.ITEM.settings(saved.get()).graphical());
+        var reset = new SettingsView(saved.get(), "", store::save, () -> {});
+        press(reset, KeyCode.UP); press(reset, KeyCode.ENTER);
+        assertEquals(GameSettings.DEFAULT, store.load());
+    }
+    @Test void resetsAllSettingsAndSavesKeysWithoutLeavingKeyPage() {
+        var initial = new GameSettings(Difficulty.HARD, true, GameMode.ITEM, ScreenSize.SMALL,
+                KeyBindings.defaults().with(GameAction.HOLD, "H"));
+        var saved = new AtomicReference<GameSettings>();
+        var view = new SettingsView(initial, "", saved::set, () -> {});
+        press(view, KeyCode.UP); press(view, KeyCode.ENTER);
+        assertEquals(GameSettings.DEFAULT, saved.get());
+        press(view, KeyCode.UP); press(view, KeyCode.UP); press(view, KeyCode.UP); press(view, KeyCode.ENTER);
+        press(view, KeyCode.ENTER); press(view, KeyCode.Q);
+        press(view, KeyCode.UP); press(view, KeyCode.ENTER);
+        assertEquals("Q", saved.get().keyBindings().key(GameAction.LEFT));
+        assertTrue(view.getChildren().getFirst() instanceof KeyBindingsView);
+        assertTrue(text(view).contains("키 설정을 저장했습니다"));
+    }
+
+    @Test void landingPreviewKeepsItemSymbolsGrayThroughFrameEncoding() {
+        var factory = new tetris.block.ItemBlockFactory(new Random(1));
+        var game = new Game(new tetris.board.Board(),
+                () -> factory.create(true, TetrominoType.T, tetris.block.ItemType.BOMB, 0, 0),
+                new GameSettings(Difficulty.NORMAL, false, GameMode.ITEM), new tetris.score.DeletionScorePolicy());
+        game.start(); game.softDrop(); game.rotateClockwise();
+        var snapshot = BattleFrame.decode(BattleFrame.of(game, "PLAYER1").encode()).board();
+        var item = snapshot.ghostCells().stream().filter(p -> snapshot.symbols()[p.row()][p.col()] == 'B').findFirst().orElseThrow();
+        var view = new ColoredBoardView();
+        view.render(snapshot.cells(), snapshot.symbols(), snapshot.ghostCells(), Set.of(), false, false);
+        var row = (javafx.scene.layout.HBox) view.getChildren().get(item.row() + 1);
+        var glyph = (Text) row.getChildren().get(item.col() + 1);
+        assertEquals("B ", glyph.getText()); assertEquals(Color.GRAY, glyph.getFill());
+        assertTrue(snapshot.cells()[item.row()][item.col()].isEmpty());
+    }
     @Test
     void boardAndBothPreviewPalettesUseBlockApiAndOnlyOSymbols() {
         Cell[][] cells = new Cell[20][10];

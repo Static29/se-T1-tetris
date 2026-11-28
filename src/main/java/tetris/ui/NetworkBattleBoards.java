@@ -23,11 +23,16 @@ final class NetworkBattleBoards extends GridPane {
     }
 
     void render(BattleFrame own, List<BattleFrame> others, boolean colorBlind) {
+        render(own, others, colorBlind, false);
+    }
+    void render(BattleFrame own, List<BattleFrame> others, boolean colorBlind, boolean graphical) {
         if (others.size() > 3) throw new IllegalArgumentException("상대는 최대 3명입니다.");
         if (slots.size() != Math.max(1, others.size())) arrange(Math.max(1, others.size()));
+        local.board.setGraphical(graphical);
         local.board.render(own, colorBlind);
         for (int i = 0; i < slots.size(); i++) {
             var slot = slots.get(i);
+            slot.board.setGraphical(graphical);
             slot.board.setVisible(i < others.size());
             if (i < others.size()) slot.board.render(others.get(i), colorBlind);
         }

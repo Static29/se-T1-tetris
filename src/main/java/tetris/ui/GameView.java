@@ -148,6 +148,8 @@ public class GameView extends StackPane {
                 + "\n\n점수: " + game.getScore() + "\n\n삭제 줄: " + game.getClearedLines()
                 + "\n\n속도: " + String.format(java.util.Locale.ROOT, "%.2fx", game.getSpeedMultiplier()));
         var snapshot = game.getBoardSnapshot();
+        boardView.setGraphical(controls.graphical());
+        nextPreview.setGraphical(controls.graphical()); holdPreview.setGraphical(controls.graphical());
         boardView.render(snapshot.cells(), snapshot.symbols(), snapshot.ghostCells(),
                 snapshot.flashingRows(), snapshot.flashOn(), controls.colorBlindMode());
         if (getScene() != null && (game.getState() == GameState.RUNNING

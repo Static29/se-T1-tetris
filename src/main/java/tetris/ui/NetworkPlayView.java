@@ -216,7 +216,7 @@ final class NetworkPlayView extends StackPane implements AutoCloseable {
                 roster.setText(text.toString());
             } else if (page == Page.GAME) {
                 var visible = session.visibleFrames();
-                if (!visible.isEmpty()) boards.render(visible.getFirst(), visible.subList(1, visible.size()), settings.colorBlindMode());
+                if (!visible.isEmpty()) boards.render(visible.getFirst(), visible.subList(1, visible.size()), settings.colorBlindMode(), settings.graphical());
                 gameStatus.setText((session.playing() ? "플레이 중" : "관전 / 결과 대기") + " · " + session.rulesLabel()
                         + (session.timed() ? " · 남은 시간 " + session.remainingSeconds() + "초" : ""));
             }

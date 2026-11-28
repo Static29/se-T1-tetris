@@ -138,7 +138,7 @@ public final class NetworkBattleView extends VBox implements AutoCloseable {
                 var localFrame = session.local();
                 boards.setVisible(localFrame != null); boards.setManaged(boards.isVisible());
                 var opponent = session.opponent();
-                boards.render(localFrame, opponent == null ? List.of() : List.of(opponent), settings.colorBlindMode());
+                boards.render(localFrame, opponent == null ? List.of() : List.of(opponent), settings.colorBlindMode(), settings.graphical());
                 ready.setText(session.isReady() ? "준비 취소" : "게임 시작 / 준비");
             }
         }

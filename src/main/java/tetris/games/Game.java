@@ -34,6 +34,7 @@ public class Game {
     private final LockDelay lockDelay = new LockDelay();
     public static final long LINE_CLEAR_MILLIS = 360;
     private final Deque<LineClearEffect> clearEffects = new ArrayDeque<>();
+    private BombClearEffect bombEffect;
     private long clearElapsed;
     private long gameTime;
     private long fallElapsed;
@@ -206,10 +207,11 @@ public class Game {
     }
 
     private boolean canAct() { return state == GameState.RUNNING && !isClearingLines(); }
-    public boolean isClearingLines() { return !clearEffects.isEmpty(); }
+    public boolean isClearingLines() { return bombEffect != null || !clearEffects.isEmpty(); }
     public int getLinesUntilItem() { return spawner.getLinesUntilItem(); }
     public boolean isClearFlashOn() { return (clearElapsed / 60) % 2 == 0; }
     public Set<Integer> getFlashingVisibleRows() {
+        if (bombEffect != null) return Set.of();
         return projection.flashingRows(clearEffects.peek());
     }
 
@@ -234,11 +236,13 @@ public class Game {
 
     /** 화면용 복사본에만 낙하 중 블록을 합성한다. 숨겨진 행은 제외한다. */
     public Cell[][] getVisibleCells() {
+        if (bombEffect != null) return bombEffect.snapshot(isClearFlashOn()).cells();
         return projection.snapshot(visibleActiveBlock(), null, clearEffects.peek(), isClearFlashOn()).cells();
     }
 
     /** 표시 전용. 고정 M과 낙하 중 아이템의 기호를 반환한다. */
     public char[][] getVisibleSymbols() {
+        if (bombEffect != null) return bombEffect.snapshot(isClearFlashOn()).symbols();
         return projection.snapshot(visibleActiveBlock(), null, clearEffects.peek(), isClearFlashOn()).symbols();
     }
 
@@ -249,6 +253,7 @@ public class Game {
 
     /** UI는 프레임당 이 메서드 한 번으로 셀·문자·착지·깜빡임 데이터를 얻는다. */
     public GameBoardSnapshot getBoardSnapshot() {
+        if (bombEffect != null) return bombEffect.snapshot(isClearFlashOn());
         return projection.snapshot(visibleActiveBlock(), landingBlock(), clearEffects.peek(), isClearFlashOn());
     }
 
@@ -309,7 +314,8 @@ public class Game {
                 clearElapsed += step;
                 if (clearElapsed >= LINE_CLEAR_MILLIS) {
                     clearElapsed = 0;
-                    clearEffects.removeFirst();
+                    if (bombEffect != null) bombEffect = null;
+                    else clearEffects.removeFirst();
                 }
                 continue;
             }
@@ -335,10 +341,20 @@ public class Game {
 
     private void lockCurrent() {
         double speed = getSpeedMultiplier();
-        var result = locker.lock(board, currentBlock, clearEffects::addLast);
+        var beforeBomb = currentBlock.getItemType() == ItemType.BOMB
+                ? projection.snapshot(currentBlock, null, null, false) : null;
+        var effects = new java.util.ArrayList<LineClearEffect>();
+        var result = locker.lock(board, currentBlock, effects::add);
         if (result.lockOut()) {
             state = GameState.GAME_OVER;
             return;
+        }
+        clearEffects.addAll(effects);
+        if (beforeBomb != null) {
+            // 첫 줄 삭제 직전의 화면은 폭발 직후이며, 아직 행 이동이나 받은 공격 삽입이 없다.
+            var afterBomb = effects.isEmpty() ? board.getVisibleCells() : effects.getFirst().visibleCells();
+            var effect = new BombClearEffect(beforeBomb, afterBomb);
+            if (!effect.isEmpty()) bombEffect = effect;
         }
         score += scorePolicy.lockedBlock(result, currentBlock.getItemType(), getDifficulty(), speed);
         clearedLines += result.totalRowsCleared();
