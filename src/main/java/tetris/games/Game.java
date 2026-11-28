@@ -50,6 +50,7 @@ public class Game {
     private final Board board;
     private Block currentBlock;
     private int clearedLines;
+    private int displayedLines;   // 화면 "삭제 줄": 받은 줄 포함(아이템 시점 예상용). 속도는 clearedLines(board 담당, 팀 합의)
     private final GameSettings settings;
     private final ScorePolicy scorePolicy;
     private long score;
@@ -214,7 +215,7 @@ public class Game {
         return projection.flashingRows(clearEffects.peek());
     }
 
-    public int getClearedLines() { return clearedLines; }
+    public int getClearedLines() { return displayedLines; }
     public int getVisibleRows() { return board.getVisibleRows(); }
     public int getColumns() { return board.getColumns(); }
     public long getScore() { return score; }
@@ -357,6 +358,7 @@ public class Game {
         }
         score += scorePolicy.lockedBlock(result, currentBlock.getItemType(), getDifficulty(), speed);
         clearedLines += result.totalRowsCleared();
+        displayedLines += result.rowsForItemCounter();
         // 공격 가능 여부는 보드 결과를 따른다. M은 점수만 바꾸므로 줄 삭제 공격도 유지한다.
         if (!result.attackRows().isEmpty()) attackListener.accept(result.attackRows());
         if (incoming.insertInto(board)) {
@@ -365,7 +367,7 @@ public class Game {
         }
         takeNext();
         // 기존 Next는 그대로 Current로 넘긴 뒤 새 Next에 아이템을 반영한다.
-        spawner.onLinesCleared(result.totalRowsCleared());
+        spawner.onLinesCleared(result.rowsForItemCounter());   // 받은 줄도 아이템 카운트에는 포함(board 담당, 팀 합의)
         holdUsed = false;
         initializeCurrentPieceState();
     }

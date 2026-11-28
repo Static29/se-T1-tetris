@@ -53,7 +53,9 @@
 | 회전 | `BlockRotation.tryRotate(board, block)` | |
 | 하강·고정 여유 | `FallSpeed`, `LockDelay` | Game이 일시정지를 뺀 게임 시간을 누적해 넘긴다 |
 | 고정 | `BlockLocker.lock(board, block, effects)` | 점수 = (줄 점수 + 칸 점수) × (M이면 2) |
-| 속도·아이템 카운트 | `LockResult.totalRowsCleared()` → `spawner.onLinesCleared(...)` | L로 지운 줄도 포함 |
+| 속도 | `LockResult.totalRowsCleared()` → Game `clearedLines` | L로 지운 줄 포함, 받은 줄 제외 |
+| 아이템 카운트 | `LockResult.rowsForItemCounter()` → `spawner.onLinesCleared(...)` | 받은 줄도 포함 (Game 1줄, 2026-11-20 팀 합의) |
+| 화면 "삭제 줄" | `LockResult.rowsForItemCounter()` → Game `displayedLines` → `getClearedLines()` | 받은 줄도 포함해 아이템 시점을 예상할 수 있게 함. 속도용 `clearedLines`와 따로 둠 (2026-11-20 팀 합의) |
 | 무게추 | `WeightMover`, `FallSpeed.getWeightIntervalMillis` | 무게추 Hold 금지(게임 결정) |
 | 화면 | `board.getVisibleCells()`, `board.isMultiplier(row, col)`, `BlockLocker.cellOf(block)` | 무게추는 `getType()`이 null이라 `cellOf`로 `Cell.WEIGHT` 변환 |
 | 대전: 공격 | `LockResult.attackRows()` → 상대 `GarbageQueue.receive(...)` | 빈 목록이면 보낼 것 없음. 다인 모드는 `isFull()`로 대상 고르기 |
@@ -76,6 +78,7 @@
 ## 대전 모드 공격 줄 (Req3, 팀 결정 2026-11-12)
 
 한 블록을 고정하며 지운 줄(L 줄 + 꽉 찬 줄)이 `BlockLocker.MIN_ATTACK_ROWS`(2)줄 이상이면 그 줄들을 위아래 순서 그대로 보낸다.
+상대에게 받은 줄(`GARBAGE` 칸이 있는 줄)은 지워도 다시 보내지 않고 2줄 기준에도 세지 않는다(팀 결정 2026-11-18). 받은 줄은 점수(줄·칸 점수, 그 줄의 M 배율)와 속도에서도 빠지고 아이템 등장 카운트에만 들어간다(팀 결정 2026-11-20). `LockResult`의 줄·칸 수는 내 줄 기준이고, 받은 줄 수는 `receivedRowsCleared`에 따로 담긴다.
 
 | 고정한 블록 | 보내는가 | 공격 줄에서 비우는 칸 |
 | --- | --- | --- |

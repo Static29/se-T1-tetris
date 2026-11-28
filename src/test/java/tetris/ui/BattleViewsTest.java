@@ -115,7 +115,7 @@ class BattleViewsTest {
         var process = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
         assertTrue(process.waitFor(20, TimeUnit.SECONDS)); assertEquals(0, process.exitValue());
     }
-    @Test void aiChoiceIsExplicitlyPendingAndConnectionUsesKeyboardFields() throws Exception {
+    @Test void aiChoiceIsExplicitlyPendingAndConnectionNeedsNoManualCertificate() throws Exception {
         fx(() -> {
             var started = new AtomicReference<BattleMatch>();
             var setup = new BattleSetupView(GameSettings.DEFAULT, started::set, () -> {});
@@ -130,10 +130,10 @@ class BattleViewsTest {
             assertTrue(text(setup).contains("상대: < 사람"));
             press(rules, KeyCode.DOWN); press(rules, KeyCode.ENTER); assertNotNull(started.get());
             var network = new NetworkPlayView(GameSettings.DEFAULT, () -> {});
-            var fields = nodes(network, TextField.class);
-            fields.stream().filter(f -> f.getPromptText().equals("포트")).findFirst().orElseThrow().setText("bad");
-            nodes(network, Button.class).stream().filter(b -> b.getText().equals("보안 연결")).findFirst().orElseThrow().fire();
-            assertTrue(nodes(network, Label.class).stream().anyMatch(l -> l.getText().contains("65535")));
+            assertTrue(nodes(network, TextField.class).isEmpty());
+            assertTrue(nodes(network, Button.class).stream().noneMatch(b -> b.getText().contains("인증서")));
+            assertTrue(nodes(network, Button.class).stream().anyMatch(b -> b.getText().equals("다시 연결")));
+            assertTrue(nodes(network, Label.class).stream().anyMatch(l -> l.getText().contains("자동으로 연결")));
             snapshot(network, 1100, 950, "network-connect"); network.close();
         });
     }

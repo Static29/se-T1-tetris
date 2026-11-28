@@ -209,7 +209,8 @@ class BlockLockerTest {
         assertThrows(NullPointerException.class, () -> locker.lock(new Board(), null));
         assertThrows(NullPointerException.class, () -> BlockLocker.cellOf(null));
         assertThrows(IllegalArgumentException.class, () -> new LockResult(false, -1, 0, 0, false));
-        assertThrows(NullPointerException.class, () -> new LockResult(false, 0, 0, 0, false, null));
+        assertThrows(IllegalArgumentException.class, () -> new LockResult(false, 0, 0, 0, false, -1, List.of()));
+        assertThrows(NullPointerException.class, () -> new LockResult(false, 0, 0, 0, false, 0, null));
     }
 
     // ---- 대전 모드 공격 줄(Req3) ----
@@ -324,5 +325,82 @@ class BlockLockerTest {
         LockResult result = locker.lock(board, new ItemBlockFactory().create(true, null, ItemType.WEIGHT, 3, 4));
         assertEquals(2, result.fullRowsCleared());
         assertEquals(List.of(), result.attackRows());
+    }
+
+    // ---- 받은 줄: 되돌려 보내지 않고(11-18), 점수·속도에서 빼고 아이템 카운트에만 센다(11-20) ----
+
+    @Test
+    void receivedRowIsNotSentBackAndCountsOnlyForItems() {
+        // row 5는 상대에게 받은 줄(3~5칸 빔), row 4는 내 줄. T가 둘을 함께 채워 2줄을 지운다.
+        Board board = new Board(6, 0, 10);
+        board.pushUpGarbage(List.of(holes(3, 4, 5)));
+        fillExcept(board, 4, 4);
+        LockResult result = locker.lock(board, tBlock(null, 0));
+        assertEquals(1, result.fullRowsCleared(), "점수 대상은 내 줄만");
+        assertEquals(1, result.receivedRowsCleared());
+        assertEquals(1, result.totalRowsCleared(), "속도도 내 줄만");
+        assertEquals(2, result.rowsForItemCounter(), "아이템 카운트는 받은 줄까지");
+        assertEquals(List.of(), result.attackRows(), "내 줄은 1줄뿐이라 보내지 않는다");
+        assertTrue(board.isEmpty(5, 0), "받은 줄도 보드에서는 지워진다");
+    }
+
+    @Test
+    void multiplierInReceivedRowDoesNotDoubleTheScore() {
+        // M이 아래 줄(row 5 = 받은 줄의 빈칸)에 붙은 T. 받은 줄은 점수에서 빠지므로 그 줄의 M도 배율을 주지 않는다.
+        int index = 0;
+        while (Position.fromXY(tBlock(ItemType.MULTIPLIER, index).getBoardItemCells()).get(0).row() != 5) {
+            index++;
+        }
+        Board board = new Board(6, 0, 10);
+        board.pushUpGarbage(List.of(holes(3, 4, 5)));
+        fillExcept(board, 4, 4);
+        LockResult result = locker.lock(board, tBlock(ItemType.MULTIPLIER, index));
+        assertEquals(1, result.fullRowsCleared());
+        assertEquals(1, result.receivedRowsCleared());
+        assertFalse(result.multiplierApplied());
+    }
+
+    @Test
+    void onlyOwnRowsAreSentWhenTheyAreTwoOrMore() {
+        // 세로 I가 row 2~5를 차지한다. row 2·3은 내 줄, row 4·5는 받은 줄.
+        Board board = new Board(6, 0, 10);
+        Block vertical = new Block(TetrominoType.I, 3, 2);
+        vertical.rotate();
+        int col = Position.fromXY(vertical.getBoardCells()).get(0).col();
+        board.pushUpGarbage(List.of(holes(col), holes(col)));
+        fillExcept(board, 2, col);
+        fillExcept(board, 3, col);
+        LockResult result = locker.lock(board, vertical);
+        assertEquals(2, result.fullRowsCleared());
+        assertEquals(2, result.receivedRowsCleared());
+        assertEquals(4, result.rowsForItemCounter());
+        assertEquals(List.of(holes(col), holes(col)), result.attackRows());
+    }
+
+    @Test
+    void lineClearOnReceivedRowIsNotSentBack() {
+        // L이 아래 줄(row 5 = 받은 줄)에 붙은 T. L이 받은 줄을 지우고, 내려온 내 줄(row 4)은 꽉 차서 지워진다.
+        int index = 0;
+        while (Position.fromXY(tBlock(ItemType.LINE_CLEAR, index).getBoardItemCells()).get(0).row() != 5) {
+            index++;
+        }
+        Board board = new Board(6, 0, 10);
+        board.pushUpGarbage(List.of(holes(0, 3, 4, 5)));
+        fillExcept(board, 4, 4);
+        LockResult result = locker.lock(board, tBlock(ItemType.LINE_CLEAR, index));
+        assertEquals(0, result.itemRowsCleared(), "L이 지운 받은 줄은 내 줄로 세지 않는다");
+        assertEquals(0, result.itemCellsRemoved(), "받은 줄의 칸 점수도 없다");
+        assertEquals(1, result.fullRowsCleared());
+        assertEquals(1, result.receivedRowsCleared());
+        assertEquals(2, result.rowsForItemCounter());
+        assertEquals(List.of(), result.attackRows(), "내 줄은 1줄뿐이라 보내지 않는다");
+    }
+
+    @Test
+    void lockResultSeparatesSpeedRowsFromItemCounterRows() {
+        LockResult result = new LockResult(false, 2, 1, 4, false, 3, List.of());
+        assertEquals(3, result.totalRowsCleared());
+        assertEquals(6, result.rowsForItemCounter());
+        assertEquals(0, new LockResult(false, 1, 0, 0, false).receivedRowsCleared(), "기존 생성자는 받은 줄 0");
     }
 }
