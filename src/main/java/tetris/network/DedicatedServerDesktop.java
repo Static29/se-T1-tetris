@@ -32,6 +32,11 @@ public final class DedicatedServerDesktop {
     private void show() {
         Path demoKey = Path.of(System.getProperty("java.io.tmpdir"), "tetris-account-demo", "server.p12");
         if (Files.isRegularFile(demoKey)) certificate.setText(demoKey.toString());
+        // Optional local launcher settings; secrets are never passed in command-line arguments.
+        if (System.getenv("TETRIS_SERVER_BIND") != null) bind.setText(System.getenv("TETRIS_SERVER_BIND"));
+        if (System.getenv("TETRIS_SERVER_PORT") != null) port.setText(System.getenv("TETRIS_SERVER_PORT"));
+        if (System.getenv("TETRIS_SERVER_KEY") != null) certificate.setText(System.getenv("TETRIS_SERVER_KEY"));
+        if (System.getenv("TETRIS_SERVER_PASSWORD") != null) password.setText(System.getenv("TETRIS_SERVER_PASSWORD"));
 
         JPanel form = new JPanel(new GridLayout(0, 2, 8, 8));
         form.add(new JLabel("바인드 주소"));
@@ -78,6 +83,7 @@ public final class DedicatedServerDesktop {
         frame.pack();
         frame.setLocationRelativeTo(null);
         frame.setVisible(true);
+        if ("true".equals(System.getenv("TETRIS_SERVER_AUTOSTART"))) start();
     }
 
     private void start() {
