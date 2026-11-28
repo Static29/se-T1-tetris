@@ -24,7 +24,7 @@ final class SoloSetupView extends VBox {
                 case ENTER -> {
                     if (selected < 2) change(1);
                     else if (selected == 2) start.accept(new GameSettings(difficulty, base.colorBlindMode(), mode,
-                            base.screenSize(), base.keyBindings(), base.playerTwoBindings()));
+                            base.screenSize(), base.keyBindings(), base.playerTwoBindings(), base.graphical()));
                     else back.run();
                 }
                 case ESCAPE -> back.run();

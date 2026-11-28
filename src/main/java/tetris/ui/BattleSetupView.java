@@ -17,7 +17,7 @@ final class BattleSetupView extends VBox {
     private void startMatch(GameSettings settings, Consumer<BattleMatch> start) {
         BattleRulesView rules = (BattleRulesView) getChildren().get(1);
         var selected = new GameSettings(rules.difficulty(), settings.colorBlindMode(), settings.mode(),
-                settings.screenSize(), settings.keyBindings(), settings.playerTwoBindings());
+                settings.screenSize(), settings.keyBindings(), settings.playerTwoBindings(), settings.graphical());
         start.accept(new BattleMatch(2, rules.mode(), rules.seconds(), selected));
     }
 }

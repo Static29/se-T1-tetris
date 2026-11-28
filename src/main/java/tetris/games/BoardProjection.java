@@ -42,6 +42,13 @@ final class BoardProjection {
                 }
             }
         }
+        if (landing != null && effect == null) {
+            for (int[] local : landing.getCells()) {
+                int row = landing.getY() + local[1], col = landing.getX() + local[0];
+                if (board.isVisibleRow(row) && cells[screenRow(row)][col].isEmpty())
+                    symbols[screenRow(row)][col] = landing.getCellSymbol(local[0], local[1]);
+            }
+        }
         return new GameBoardSnapshot(cells, symbols, effect == null ? ghostCells(landing) : List.of(),
                 flashingRows(effect), flashOn);
     }

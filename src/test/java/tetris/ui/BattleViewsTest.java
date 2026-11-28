@@ -21,6 +21,36 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @Timeout(20)
 class BattleViewsTest {
+    @Test void graphicalBoardsAndPreviewsSwitchWithoutChangingGame() throws Exception {
+        fx(() -> {
+            var settings = new GameSettings(Difficulty.NORMAL, false, GameMode.ITEM, ScreenSize.DEFAULT,
+                    KeyBindings.defaults(), KeyBindings.playerTwoDefaults(), true);
+            var board = new tetris.board.Board();
+            for (int r = 18; r < 22; r++) for (int c = 0; c < 10; c++)
+                if (c != 4 && c != 5 && (r + c) % 4 != 0)
+                    board.lock(List.of(new tetris.board.Position(r, c)), tetris.board.Cell.values()[1 + c % 7]);
+            var factory = new tetris.block.ItemBlockFactory(new Random(1));
+            var game = new Game(board, () -> factory.create(true, tetris.block.TetrominoType.T, tetris.block.ItemType.BOMB, 0, 0),
+                    settings, new tetris.score.DeletionScorePolicy());
+            game.start(); for (int i = 0; i < 6; i++) game.softDrop(); game.pause();
+            long score = game.getScore();
+            var solo = new GameView(game, () -> {}, () -> {});
+            solo.applyPreferences(settings);
+            var rendered = nodes(solo, ColoredBoardView.class).getFirst();
+            assertTrue(rendered.getChildren().getFirst() instanceof javafx.scene.canvas.Canvas);
+            snapshot(solo, 800, 720, "gui-solo");
+            solo.applyPreferences(GameSettings.DEFAULT);
+            assertTrue(rendered.getChildren().getFirst() instanceof javafx.scene.text.Text);
+            assertEquals(score, game.getScore()); assertEquals(GameState.PAUSED, game.getState());
+            var match = new BattleMatch(2, BattleMode.ITEM, 180, settings);
+            var local = new LocalBattleView(match, settings, () -> {});
+            snapshot(local, 880, 850, "gui-local"); local.close();
+            var network = new NetworkBattleBoards();
+            var frame = BattleFrame.of(game, "PLAYER1");
+            network.render(frame, List.of(frame, frame, frame), true, true);
+            snapshot(network, 1000, 540, "gui-network-four");
+        });
+    }
     @Test @Timeout(60) void authenticatedRoomUiRegistersLogsInPlaysAndReturns() throws Exception {
         Path store = temporary.resolve("server.p12"), certificate = temporary.resolve("server.cer");
         String keytool = Path.of(System.getProperty("java.home"), "bin", "keytool.exe").toString();

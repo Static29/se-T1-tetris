@@ -16,6 +16,14 @@ import java.util.Set;
 public final class ColoredBoardView extends VBox {
     private final Text[][] cells;
     private final BoardDimensions dimensions;
+    private final javafx.scene.canvas.Canvas graphics;
+    private final List<javafx.scene.Node> textRows;
+    private boolean graphical;
+    public void setGraphical(boolean enabled) {
+        if (graphical == enabled) return;
+        graphical = enabled;
+        if (enabled) getChildren().setAll(graphics); else getChildren().setAll(textRows);
+    }
     public ColoredBoardView() {
         this(BoardDimensions.DEFAULT.rows(), BoardDimensions.DEFAULT.columns());
     }
@@ -33,6 +41,8 @@ public final class ColoredBoardView extends VBox {
             getChildren().add(line);
         }
         getChildren().add(label(dimensions.border()));
+        graphics = new javafx.scene.canvas.Canvas(columns * 23 + 4, rows * 23 + 4);
+        textRows = List.copyOf(getChildren());
     }
     public void render(Cell[][] snapshot, boolean colorBlindMode) {
         render(snapshot, null, List.of(), Set.of(), false, colorBlindMode);
@@ -43,12 +53,18 @@ public final class ColoredBoardView extends VBox {
         dimensions.validate(snapshot);
         dimensions.validate(symbols);
         Set<Position> ghostPositions = Set.copyOf(ghost);
+        var g = graphics.getGraphicsContext2D();
+        if (graphical) {
+            g.setFill(Color.web("#0b101a")); g.fillRect(0, 0, graphics.getWidth(), graphics.getHeight());
+            g.setStroke(Color.web("#62718a")); g.setLineWidth(1);
+            g.strokeRect(.5, .5, graphics.getWidth() - 1, graphics.getHeight() - 1);
+        }
         for (int row = 0; row < dimensions.rows(); row++) for (int col = 0; col < dimensions.columns(); col++) {
             Cell cell = snapshot[row][col];
             boolean silhouette = cell.isEmpty() && ghostPositions.contains(new Position(row, col));
             char symbol = symbols == null ? (cell.isEmpty() ? '.' : 'O') : symbols[row][col];
             boolean item = !cell.isEmpty() && "LFBM".indexOf(symbol) >= 0;
-            cells[row][col].setText((silhouette ? 'O' : symbol) + " ");
+            cells[row][col].setText((silhouette && ".O".indexOf(symbol) >= 0 ? 'O' : symbol) + " ");
             Color color = silhouette ? Color.GRAY : cell.isEmpty() ? Color.DIMGRAY
                     : item ? Color.WHITE
                     : cell == Cell.WEIGHT ? Color.WHITESMOKE
@@ -56,6 +72,17 @@ public final class ColoredBoardView extends VBox {
                     : Color.web(TetrominoType.valueOf(cell.name()).getColorHex(colorBlindMode));
             cells[row][col].setFill(flashingRows.contains(row)
                     ? (flashOn ? Color.WHITE : Color.TRANSPARENT) : color);
+            if (graphical) {
+                double x = col * 23 + 2, y = row * 23 + 2;
+                g.setStroke(Color.web("#172030")); g.setLineWidth(.5); g.strokeRect(x, y, 23, 23);
+                if (flashingRows.contains(row) && !flashOn) continue;
+                if (!cell.isEmpty() || silhouette) {
+                    Color blockColor = flashingRows.contains(row) ? Color.WHITE
+                            : silhouette ? Color.GRAY : cell == Cell.WEIGHT ? Color.WHITESMOKE
+                            : cell == Cell.GARBAGE ? Color.GRAY : Color.web(TetrominoType.valueOf(cell.name()).getColorHex(colorBlindMode));
+                    BlockGraphics.tile(g, x, y, 23, blockColor, symbol, silhouette);
+                }
+            }
         }
     }
     private Text label(String value) {

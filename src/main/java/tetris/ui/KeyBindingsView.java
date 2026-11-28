@@ -10,6 +10,9 @@ import javafx.scene.paint.Color;
 import tetris.games.*;
 
 public final class KeyBindingsView extends VBox {
+    @FunctionalInterface
+    public interface SaveAction { void save(KeyBindings first, KeyBindings second) throws java.io.IOException; }
+    private final SaveAction save;
     private KeyBindings bindings;
     private KeyBindings second;
     private int player;
@@ -21,6 +24,10 @@ public final class KeyBindingsView extends VBox {
         this(initial, KeyBindings.compatiblePlayerTwo(initial), (first, second) -> done.accept(first));
     }
     public KeyBindingsView(KeyBindings initial, KeyBindings second, BiConsumer<KeyBindings, KeyBindings> done) {
+        this(initial, second, done, null);
+    }
+    public KeyBindingsView(KeyBindings initial, KeyBindings second, BiConsumer<KeyBindings, KeyBindings> done, SaveAction save) {
+        this.save = save;
         bindings = initial;
         this.second = second;
         setAlignment(Pos.CENTER);
@@ -48,8 +55,8 @@ public final class KeyBindingsView extends VBox {
                 }
             } else {
                 switch (event.getCode()) {
-                    case UP -> selected = Math.floorMod(selected - 1, 9);
-                    case DOWN -> selected = (selected + 1) % 9;
+                    case UP -> selected = Math.floorMod(selected - 1, save == null ? 9 : 10);
+                    case DOWN -> selected = (selected + 1) % (save == null ? 9 : 10);
                     case LEFT, RIGHT, TAB -> { player = 1 - player; message = ""; }
                     case ESCAPE -> done.accept(bindings, this.second);
                     case ENTER -> {
@@ -58,7 +65,11 @@ public final class KeyBindingsView extends VBox {
                             else capturing = true;
                         }
                         else if (selected == 7) { bindings = KeyBindings.defaults(); this.second = KeyBindings.playerTwoDefaults(); message = "두 플레이어의 기본 키로 복원했습니다."; }
-                        else done.accept(bindings, this.second);
+                        else if (selected == 8) done.accept(bindings, this.second);
+                        else {
+                            try { save.save(bindings, this.second); message = "키 설정을 저장했습니다."; }
+                            catch (java.io.IOException e) { message = "저장하지 못했습니다. 다시 시도하세요."; }
+                        }
                     }
                     default -> { }
                 }
@@ -74,9 +85,13 @@ public final class KeyBindingsView extends VBox {
                     .append(": ").append(player == 1 && action == GameAction.PAUSE ? "ESCAPE (나가기 · 고정)"
                             : (player == 0 ? bindings : second).key(action)).append("\n");
         text.append(selected == 7 ? "> " : "  ").append("기본 키 복원\n")
-                .append(selected == 8 ? "> " : "  ").append("설정으로 돌아가기\n\n");
+                .append(selected == 8 ? "> " : "  ").append("설정으로 돌아가기\n");
+        if (save != null) text.append(selected == 9 ? "> " : "  ").append("키 설정 저장\n");
+        text.append('\n');
         text.append(capturing ? "새 키를 누르세요 (Esc: 변경 취소)" : "↑/↓: 선택  ←/→ 또는 Tab: 1P/2P 전환\nEnter: 변경  Esc: 돌아가기")
-                .append("\n1P: 솔로·네트워크·로컬 왼쪽 / 2P: 로컬 오른쪽\nNUMPAD1/2는 숫자패드 키입니다.\n설정 화면에서 저장해야 적용됩니다.\n\n").append(message);
+                .append("\n1P: 솔로·네트워크·로컬 왼쪽 / 2P: 로컬 오른쪽\nNUMPAD1/2는 숫자패드 키입니다.\n")
+                .append(save == null ? "설정 화면에서 저장해야 적용됩니다." : "키 설정 저장으로 이 화면에서 바로 저장할 수 있습니다.")
+                .append("\n\n").append(message);
         content.setText(text.toString());
     }
 }

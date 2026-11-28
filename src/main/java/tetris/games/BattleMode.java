@@ -8,7 +8,7 @@ public enum BattleMode {
     BattleMode(String label, GameMode gameMode) { this.label = label; this.gameMode = gameMode; }
     public GameSettings settings(GameSettings base) {
         return new GameSettings(base.difficulty(), base.colorBlindMode(), gameMode,
-                base.screenSize(), base.keyBindings(), base.playerTwoBindings());
+                base.screenSize(), base.keyBindings(), base.playerTwoBindings(), base.graphical());
     }
     @Override public String toString() { return label; }
 }

@@ -12,6 +12,14 @@ final class BattleBoardPane extends VBox {
     private final String label;
     private final ColoredBoardView board = new ColoredBoardView();
     private final Text progress = text("", 12);
+    private boolean graphical;
+    private final javafx.scene.canvas.Canvas nextBlocks = new javafx.scene.canvas.Canvas(80, 80);
+    private final javafx.scene.canvas.Canvas holdBlocks = new javafx.scene.canvas.Canvas(80, 80);
+    void setGraphical(boolean enabled) {
+        graphical = enabled; board.setGraphical(enabled);
+        nextBlocks.setVisible(enabled); nextBlocks.setManaged(enabled);
+        holdBlocks.setVisible(enabled); holdBlocks.setManaged(enabled);
+    }
     private final Text next = text("", 14), hold = text("", 14), pendingTitle = text("받을 공격 0/10", 12), pending = text("", 12);
     BattleBoardPane() {
         this(null);
@@ -19,7 +27,8 @@ final class BattleBoardPane extends VBox {
     BattleBoardPane(String label) {
         super(10); this.label = label; setAlignment(Pos.TOP_CENTER);
         progress.setVisible(false); progress.setManaged(false);
-        VBox side = new VBox(6, next, hold, progress, pendingTitle, pending);
+        VBox side = new VBox(6, next, nextBlocks, hold, holdBlocks, progress, pendingTitle, pending);
+        setGraphical(false);
         HBox content = new HBox(10, board, side); content.setAlignment(Pos.TOP_CENTER);
         getChildren().addAll(heading, content);
     }
@@ -39,6 +48,11 @@ final class BattleBoardPane extends VBox {
         var snapshot = frame.board();
         board.render(snapshot.cells(), snapshot.symbols(), snapshot.ghostCells(), snapshot.flashingRows(), snapshot.flashOn(), colorBlind);
         next.setText("NEXT\n" + preview(frame.next())); hold.setText("HOLD\n" + preview(frame.hold()));
+        if (graphical) {
+            next.setText("NEXT"); hold.setText("HOLD");
+            BlockGraphics.preview(nextBlocks, frame.next(), Color.LIGHTSTEELBLUE);
+            BlockGraphics.preview(holdBlocks, frame.hold(), Color.LIGHTSTEELBLUE);
+        }
         pendingTitle.setText("받을 공격 " + frame.pending().size() + "/10");
         var s = new StringBuilder("+----------+\n");
         for (int i = 0; i < 10; i++) {

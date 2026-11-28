@@ -66,7 +66,7 @@ public final class RoomBattleSession {
                 stopped = sentOver = false; queueSpace = true;
                 elapsed = sinceState = stateSequence = attackSequence = 0;
                 game = new Game(new GameSettings(difficulty, preferences.colorBlindMode(), items ? GameMode.ITEM : GameMode.CLASSIC,
-                        preferences.screenSize(), preferences.keyBindings(), preferences.playerTwoBindings()));
+                        preferences.screenSize(), preferences.keyBindings(), preferences.playerTwoBindings(), preferences.graphical()));
                 game.setAttackListener(rows -> { if (playing()) send("ATTACK", matchId, Long.toString(attackSequence++), BattleFrame.encodeRows(rows)); });
                 game.start(); sendState(); send("QUEUE_SPACE", matchId, "true");
             }

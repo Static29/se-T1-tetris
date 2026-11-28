@@ -33,7 +33,8 @@ public final class SettingsStore {
                 second.put(action, values.getProperty("key2." + action.name(), fallback.key(action)));
             return new GameSettings(Difficulty.valueOf(values.getProperty("difficulty", "NORMAL")),
                     Boolean.parseBoolean(mode), GameMode.valueOf(values.getProperty("mode", "CLASSIC")),
-                    ScreenSize.valueOf(values.getProperty("screenSize", "DEFAULT")), first, new KeyBindings(second));
+                    ScreenSize.valueOf(values.getProperty("screenSize", "DEFAULT")), first, new KeyBindings(second),
+                    Boolean.parseBoolean(values.getProperty("graphical", "false")));
         } catch (IllegalArgumentException e) { throw new IOException("설정 파일 형식 오류", e); }
     }
     public void save(GameSettings settings) throws IOException {
@@ -42,6 +43,7 @@ public final class SettingsStore {
         values.setProperty("mode", settings.mode().name());
         values.setProperty("colorBlindMode", Boolean.toString(settings.colorBlindMode()));
         values.setProperty("screenSize", settings.screenSize().name());
+        values.setProperty("graphical", Boolean.toString(settings.graphical()));
         values.setProperty("keyBindingsVersion", "2");
         for (GameAction action : GameAction.values()) {
             values.setProperty("key." + action.name(), settings.keyBindings().key(action));

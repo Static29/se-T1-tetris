@@ -44,6 +44,8 @@ public final class LocalBattleView extends VBox implements AutoCloseable {
             refresh(settings.colorBlindMode()); e.consume();
         });
         refresh(settings.colorBlindMode());
+        boards.forEach(pane -> pane.setGraphical(settings.graphical()));
+        refresh(settings.colorBlindMode());
     }
     private void refresh(boolean colorBlind) {
         status.setText(match.finished() ? match.result() + " · Esc: 돌아가기"
